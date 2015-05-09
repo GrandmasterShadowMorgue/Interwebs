@@ -38,17 +38,19 @@ class Packet(object):
 		self.timestamp = 0 # TODO: UTC seconds
 		self.sender    = sender # TODO: How to encode sender (?)
 		self.data      = data
+		self.action    = None
 
 
 
 class Peer(object):
 
 	'''
-	Docstring goes here
+	This class represents a peer from the point of view of the server
+	(which mediates the exchange of data between peers).
 
 	'''
 
-	def __init__(self, server):
+	def __init__(self):
 		self.id     = None #
 		self.name   = None #
 		self.socket = None #
@@ -69,7 +71,7 @@ class PeerServer(object):
 
 	# TODO: Initial handshake
 
-	def __init__(self, port, ip, protocol, onsend, onreceive):
+	def __init__(self, port, ip, onsend, onreceive):
 
 		'''
 		Docstring goes here
@@ -82,14 +84,17 @@ class PeerServer(object):
 
 		# Protocol
 		# TODO: Decide exactly how to deal with these (default protocol?)
-		self.protocol  = protocol  #
-		self.onsend    = onsend    #
-		self.onreceive = onreceive #
+		# The callbacks should allow users of this library to customise the protocol for
+		# Should peers be allowed to choose which peers to communicate with each time?
+		# sending and receiving data (just for peers or for the server too?)
+		# self.protocol  = protocol #
+		self.onsend    = onsend    # 
+		self.onreceive = onreceive # What should happen when the server receives data from a peer ()
 
 		# 
 		self.address      = (ip, port)      # TODO: Use namedtuple (?)
 		self.listenSocket = socket.socket() # TODO: Arguments
-		self.connections  = []              # Connected peers (TODO: other type, eg. dict mapping IDss to connections?)
+		self.connections  = []              # Connected peers (TODO: other type, eg. dict mapping IDs to connections?)
 
 		self.listenSocket.bind(self.address) #
 
@@ -110,12 +115,50 @@ class PeerServer(object):
 
 		# 
 		# TODO: Timeout
-		# TODO: Protocol for adding new peer (initial handshake, eg. assign ID, passwords, username, 'explain' protocol, etc.)
+		# TODO: Protocol for adding new peers (initial handshake, eg. assign ID, passwords, username, 'explain' protocol, etc.)
 		peer = self.listenSocket.accept() #
 		self.connections.append(peer)     #
 		print('Accepted peer #{0}: {1}'.format(len(self.connections), peer)) # TODO: Printable clients (eg. username, ID)
 
 		return peer
+
+
+	def handshake(self, peer):
+		
+		'''
+		Docstring goes here
+
+		'''
+
+		pass
+
+
+	def protocol(self, peer):
+		
+		'''
+		Defines the protocol for the server and a single peer
+
+		'''
+
+		# TODO: Expect Packages
+		# TODO: Expect Peers
+
+		while True:
+			try:
+				size = int(peer.recv(4).decode('UTF-8')) # Read size prefix (padded to four digits)
+				received = peer.recv(size)               # Read data
+			except:
+				print('Lost connection with {0:}.'.format(peer))
+				# TODO: Remove peer from list
+				# TODO: Disconnection protocol (eg. tell other peers) (?)
+				return False # TODO: Meaningful return values (?)
+
+			data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. Package.action)
+			print('Server received {0:} bytes from {1:}.'.format(size, peer)) # TODO: Print representation of incoming data (?)
+
+			for recipient in filter(lambda recipient: recipient != peer, self.connections):
+				self.send(recipient, data)
+
 
 
 	def disconnect(self, peer):
@@ -128,12 +171,14 @@ class PeerServer(object):
 		pass
 
 
-	def send(self, data):
+	def send(self, peer, data):
 		
 		'''
 		Docstring goes here
 
 		'''
+
+		# TODO: Send to all peers by default (?)
 
 		pass
 
