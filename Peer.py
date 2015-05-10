@@ -93,6 +93,7 @@ class Peer(object):
 				print('Peer received {0:} bytes from server.'.format(size)) # TODO: Print representation of incoming data (?)
 				self.onreceive(data)
 			except Exception as e:
+				# TODO: Split exception handling when we're done debugging
 				print(e)
 				print('Lost connection with server')
 				return False # TODO: Meaningful return values (?)
