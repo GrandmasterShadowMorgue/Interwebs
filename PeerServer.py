@@ -15,6 +15,7 @@
 #        - Events (eg. peer disconnected, incoming data) (as tagged unions?)
 #        - Command line interface (?)
 #        - Proper logging
+#        - Move common utilities to separate module
 
 # SPEC | -
 #        -
@@ -28,6 +29,8 @@ import pickle
 import queue
 import time
 
+import uuid #
+
 # Testing
 # import 
 
@@ -37,9 +40,9 @@ class Packet(object):
 	# TODO: Rename message (would also handle verification, disconnects, etc.) (?)
 	# TODO: Add event tags (data, disconnect, etc.)
 	# TODO: Security (eg. avoid arbitrary callables as actions; maybe Enum instead mapped to allowed actions)
-	def __init__(self, sender, data):
-		self.timestamp = 0      # TODO: UTC seconds
-		self.event     = None   # Should be an Event enum (?)
+	def __init__(self, event, action, sender, data):
+		self.timestamp = time.time() # TODO: UTC seconds
+		self.event     = event  # Should be an Event enum (?)
 		self.sender    = sender # TODO: How to encode sender (?)
 		self.data      = data   #
 		self.action    = None   #
@@ -56,11 +59,11 @@ class Peer(object):
 
 	# TODO: Rename to desambiguate (or replace with namedtuple) (?)
 
-	def __init__(self):
-		self.id     = None #
-		self.name   = None #
-		self.socket = None #
-		self.thread = None #
+	def __init__(self, id, socket, thread):
+		self.id     = id     #
+		self.socket = socket #
+		self.thread = thread #
+		# self.name   = None   #
 
 
 
@@ -92,10 +95,9 @@ class PeerServer(object):
 		# TODO: Decide exactly how to deal with these (default protocol?)
 
 		# The callbacks should allow users of this library to customise the protocol for
-		# Should peers be allowed to choose which peers to communicate with each time?
 		# sending and receiving data (just for peers or for the server too?)
 		#
-		# 
+		# Should peers be allowed to choose which peers to communicate with each time?
 
 		# self.protocol  = protocol #
 		self.onsend    = onsend    # 
@@ -109,11 +111,18 @@ class PeerServer(object):
 		self.listenSocket.bind(self.address)   #
 		self.listenSocket.listen(self.maximum) #
 
-		# TODO: Allow user to enter main loop themselves (eg. add a start or server_forever method)
+
+	def start(self):
+		
+		'''
+		Docstring goes here
+
+		'''
+
+		# TODO: Allow user to enter main loop themselves (eg. add a start or server_forever method) (✓)
 		# Main loop (keep accepting incoming connections)
 		while self.running and self.maximum > len(self.connections):
-			#
-			self.connect()
+			self.connect() #
 
 
 	def connect(self):
@@ -128,10 +137,10 @@ class PeerServer(object):
 		# 
 		# TODO: Timeout
 		# TODO: Protocol for adding new peers (initial handshake, eg. assign ID, passwords, username, 'explain' protocol, etc.)
-		print('Listening for incoming peers...')
+		self.log('Listening for incoming peers...')
 		peer = self.listenSocket.accept() #
 		self.connections.append(peer)     #
-		print('Accepted peer #{0}: {1}'.format(len(self.connections), peer)) # TODO: Printable clients (eg. username, ID)
+		self.log('Accepted peer #{0}: {1}'.format(len(self.connections), peer)) # TODO: Printable clients (eg. username, ID)
 
 		self.handshake(peer)
 
@@ -164,20 +173,20 @@ class PeerServer(object):
 		# TODO: Unsafe to use multiple threads without syncing (?)
 
 		while True:
-			print('Running protocol with {0}'.format(peer))
+			self.log('Running protocol with {0}'.format(peer))
 			try:
 				# TODO: Handle blocks
-				size = int(peer[0].recv(4).decode('UTF-8')) # Read size prefix (padded to four digits)
-				data = peer[0].recv(size)                   # Read data
+				data = self.receive(peer)
 			except Exception as e:
-				print(e)
-				print('Lost connection with {0:}.'.format(peer))
+				self.log(type(e))
+				self.log(e)
+				self.log('Lost connection with {0:}.'.format(peer))
 				# TODO: Remove peer from list
 				# TODO: Disconnection protocol (eg. tell other peers) (?)
 				return False # TODO: Meaningful return values (?)
 
 			# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. Package.action)
-			print('Server received {0:} bytes from {1:}.'.format(size, peer)) # TODO: Print representation of incoming data (?)
+			self.log('Server received {0:} bytes from {1:}.'.format(size, peer)) # TODO: Print representation of incoming data (?)
 
 			for recipient in filter(lambda recipient: recipient != peer, self.connections):
 				self.send(recipient, data)
@@ -208,15 +217,14 @@ class PeerServer(object):
 		# TODO: Configure data size cap (?)
 
 		if len(data) > 9999:
-			print('Unable to send more than 9999 bytes of data at a time ({size} is too much)'.format(size=len(data)))
+			self.log('Unable to send more than 9999 bytes of data at a time ({size} is too much)'.format(size=len(data)))
 		else:
 			# TODO: Safe to send in two separate calls (?)
 			# TODO: Inefficient to concatenate bytes (use bytearray?)
-			print('Server is sending {size} bytes of data to {peer}'.format(size=len(data), peer=peer))
+			self.log('Server is sending {size} bytes of data to {peer}'.format(size=len(data), peer=peer))
 			# peer.send(bytes('{size:04d}'.format(size=len(data)), encoding='UTF-8'))
 			# peer.send(data)
 			return peer[0].send(bytes('{0:04d}'.format(len(data)), 'UTF-8') + data)
-
 
 
 	def receive(self, peer):
@@ -226,7 +234,12 @@ class PeerServer(object):
 
 		'''
 
-		pass
+		size = int(peer[0].recv(4).decode('UTF-8')) # Read size prefix (padded to four digits)
+		return peer[0].recv(size)                   # Read data
+
+
+	def log(self, msg, level=None):
+		if self.debug: print(msg)
 
 
 
@@ -238,6 +251,7 @@ def main():
 	'''
 
 	server = PeerServer('localhost', 255, onsend=None, onreceive=None)
+	server.start()
 
 
 if __name__ == '__main__':

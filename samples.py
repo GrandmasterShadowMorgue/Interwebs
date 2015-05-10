@@ -21,6 +21,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 
 import pickle
+import time
 
 
 
@@ -39,7 +40,9 @@ class ChatClient(object):
 
 		'''
 
-		self.size = 480, 720
+		# Configurations
+		self.size  = 480, 720
+		self.debug = True
 
 		# Create the window
 		self.window = tk.Tk()
@@ -49,19 +52,12 @@ class ChatClient(object):
 		# Create the interface
 		self.write = ttk.Entry()
 		self.write.grid(column=0, row=1)
-		# self.write.pack()
 		self.write.bind('<Return>', lambda e: self.postEntry(self.write.get()))
 
 		self.entryFrame = ttk.Frame() # width=self.size[0], height=self.size[1]-30
 		self.entryFrame.grid(column=0, row=0)
-		# self.entryFrame.pack()
 
 		self.entries = []
-
-		#
-		# TODO: This is a HORRIBLE solution
-		# if input('Would you like to create a server? ').lower() in ('yes', 'true', 'y', 'yeah'):
-			# server = PeerServer.PeerServer('localhost', 255, onsend=None, onreceive=None)
 
 		self.peer = Peer.Peer('localhost', 255, onreceive=lambda data: self.addEntry(pickle.loads(data)))
 
@@ -87,13 +83,14 @@ class ChatClient(object):
 
 		'''
 
-		print('Received message:', message)
-		entry = ttk.Label(master=self.entryFrame, text=message)
+		self.log('Received message: {0}'.format(message))
+		entry = ttk.Label(master=self.entryFrame, text=time.strftime('(%H:%M:%S) {0}', time.localtime()).format(message))
 		entry.grid(column=0, row=len(self.entries))
-		# entry.pack()
 		self.entries.append(entry)
-		# entry.pack()
 
+
+	def log(self, msg, level=None):
+		if self.debug: print(msg)
 
 
 

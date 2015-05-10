@@ -63,13 +63,13 @@ class Peer(object):
 
 		while True:
 			try:
-				print('Attempting to connect to {0:}'.format(self.address[0]))
+				self.log('Attempting to connect to {0:}'.format(self.address[0]))
 				server.connect(self.address)
-				print('Succeeded to connect.')
+				self.log('Succeeded to connect.')
 				return server
 			except:
 				# TODO: Wait (cf. delay)
-				print('Failed to connect to {0:}'.format(self.address[0]))
+				self.log('Failed to connect to {0:}'.format(self.address[0]))
 				# print('Retrying after {0:} seconds'.format(delay))
 
 
@@ -83,23 +83,23 @@ class Peer(object):
 		# TODO: Expect Packages 
 
 		while True:
-			print('Client running protocol')
+			self.log('Client running protocol')
 			try:
 				# TODO: Handle blocks
 				size = int(self.socket.recv(4).decode('UTF-8')) # Read size prefix (padded to four digits)
 				data = self.socket.recv(size)                   # Read data
 
 				# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. Package.action)
-				print('Peer received {0:} bytes from server.'.format(size)) # TODO: Print representation of incoming data (?)
+				self.log('Peer received {0:} bytes from server.'.format(size)) # TODO: Print representation of incoming data (?)
 				self.onreceive(data)
 			except Exception as e:
 				# TODO: Split exception handling when we're done debugging
-				print(e)
-				print('Lost connection with server')
+				self.log(e)
+				self.log('Lost connection with server')
 				return False # TODO: Meaningful return values (?)
 
 
-		print('Client somehow escaped protocol loop')
+		self.log('Client somehow escaped protocol loop')
 
 
 	def send(self, data):
@@ -118,6 +118,9 @@ class Peer(object):
 		# self.socket.send(pickle.dumps(data)) # TODO: Pickle by default (?)
 		return self.socket.send(bytes('{0:04d}'.format(len(data)), 'UTF-8') + data)
 
+
+	def log(self, msg, level=None):
+		if self.debug: print(msg)
 
 
 
