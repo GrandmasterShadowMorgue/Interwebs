@@ -109,7 +109,7 @@ class PeerServer(object):
 		self.listenSocket.bind(self.address)   #
 		self.listenSocket.listen(self.maximum) #
 
-		# TODO: Allow user to enter main loop themselves
+		# TODO: Allow user to enter main loop themselves (eg. add a start or server_forever method)
 		# Main loop (keep accepting incoming connections)
 		while self.running and self.maximum > len(self.connections):
 			#
