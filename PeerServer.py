@@ -30,40 +30,12 @@ import queue
 import time
 
 import uuid #
+import Enum
+
+import Protocols
 
 # Testing
 # import 
-
-
-
-class Packet(object):
-	# TODO: Rename message (would also handle verification, disconnects, etc.) (?)
-	# TODO: Add event tags (data, disconnect, etc.)
-	# TODO: Security (eg. avoid arbitrary callables as actions; maybe Enum instead mapped to allowed actions)
-	def __init__(self, event, action, sender, data):
-		self.timestamp = time.time() # TODO: UTC seconds
-		self.event     = event  # Should be an Event enum (?)
-		self.sender    = sender # TODO: How to encode sender (?)
-		self.data      = data   #
-		self.action    = None   #
-
-
-
-class Peer(object):
-
-	'''
-	This class represents a peer from the point of view of the server
-	(which mediates the exchange of data between peers).
-
-	'''
-
-	# TODO: Rename to desambiguate (or replace with namedtuple) (?)
-
-	def __init__(self, id, socket, thread):
-		self.id     = id     #
-		self.socket = socket #
-		self.thread = thread #
-		# self.name   = None   #
 
 
 
@@ -80,7 +52,7 @@ class PeerServer(object):
 
 	# TODO: Initial handshake
 
-	def __init__(self, IP, port, onsend, onreceive):
+	def __init__(self, IP, port):
 
 		'''
 		Docstring goes here
@@ -100,13 +72,21 @@ class PeerServer(object):
 		# Should peers be allowed to choose which peers to communicate with each time?
 
 		# self.protocol  = protocol #
-		self.onsend    = onsend    # 
-		self.onreceive = onreceive # What should happen when the server receives data from a peer ()
+		# self.onsend    = onsend    # 
+		# self.onreceive = onreceive
+		self.callbacks = {
+			Event.Data         : lambda package: self.broadcast(package), # - A Peer is sending data
+			Event.Disconnect   : lambda package: None, # - A Peer has disconnected
+			Event.Connect      : lambda package: None, # - A Peer is attempting to connect
+			Event.Verify       : lambda package: None, # - A Peer verifies that it has received a package
+			Event.Introduce    : lambda package: None, # - A Peer introduces itself (username, id, etc.)
+			Event.Authenticate : lambda package: None  # - Server is authenticating a peer (currently: sends an ID)
+		}
 
 		# 
 		self.address      = (IP, port)      # TODO: Use namedtuple (?)
 		self.listenSocket = socket.socket() # TODO: Arguments
-		self.connections  = []              # Connected peers (TODO: other type, eg. dict mapping IDs to connections?)
+		self.connections  = {}              # Connected peers (TODO: other type, eg. dict mapping IDs to connections?)
 
 		self.listenSocket.bind(self.address)   #
 		self.listenSocket.listen(self.maximum) #
@@ -138,11 +118,12 @@ class PeerServer(object):
 		# TODO: Timeout
 		# TODO: Protocol for adding new peers (initial handshake, eg. assign ID, passwords, username, 'explain' protocol, etc.)
 		self.log('Listening for incoming peers...')
-		peer = self.listenSocket.accept() #
-		self.connections.append(peer)     #
-		self.log('Accepted peer #{0}: {1}'.format(len(self.connections), peer)) # TODO: Printable clients (eg. username, ID)
 
-		self.handshake(peer)
+		sock = self.listenSocket.accept() #
+		peer = Protocols.Peer(id=uuid.uuid1(), socket=sock, thread=self.handshake(sock))
+
+		self.connections[peer.id] = peer #
+		self.log('Accepted peer #{0}: {1}'.format(len(self.connections), peer)) # TODO: Printable clients (eg. username, ID)
 
 		return peer
 
@@ -157,7 +138,9 @@ class PeerServer(object):
 		# TODO: Other handshake actions
 		# TODO: Customisation
 		# TODO: Save thread reference (cf. Peer.thread)
-		return threading.Thread(target=lambda: self.protocol(peer), daemon=True).start() #
+		thread = threading.Thread(target=lambda: self.protocol(peer), daemon=True)
+		thread.start() #
+		return thread  #
 
 
 	def protocol(self, peer):
@@ -176,7 +159,7 @@ class PeerServer(object):
 			self.log('Running protocol with {0}'.format(peer))
 			try:
 				# TODO: Handle blocks
-				data = self.receive(peer)
+				package = self.receive(peer)
 			except Exception as e:
 				self.log(type(e))
 				self.log(e)
@@ -188,8 +171,7 @@ class PeerServer(object):
 			# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. Package.action)
 			self.log('Server received {0:} bytes from {1:}.'.format(size, peer)) # TODO: Print representation of incoming data (?)
 
-			for recipient in filter(lambda recipient: recipient != peer, self.connections):
-				self.send(recipient, data)
+			self.broadcast(package)
 
 
 
@@ -203,7 +185,19 @@ class PeerServer(object):
 		pass
 
 
-	def send(self, peer, data):
+	def broadcast(self, package):
+
+		'''
+		Docstring goes here
+
+		'''
+
+		for recipient in self.connections.values():
+				if (recipient.id != package.sender) and (package.recipients is None or recipient.id in package.recipients):
+					self.send(recipient, package)
+
+
+	def send(self, peer, package):
 		
 		'''
 		Send data (raw bytes) to a specific peer.
@@ -224,7 +218,7 @@ class PeerServer(object):
 			self.log('Server is sending {size} bytes of data to {peer}'.format(size=len(data), peer=peer))
 			# peer.send(bytes('{size:04d}'.format(size=len(data)), encoding='UTF-8'))
 			# peer.send(data)
-			return peer[0].send(bytes('{0:04d}'.format(len(data)), 'UTF-8') + data)
+			return peer.socket[0].send(bytes('{0:04d}'.format(len(data)), 'UTF-8') + data)
 
 
 	def receive(self, peer):
@@ -235,7 +229,10 @@ class PeerServer(object):
 		'''
 
 		size = int(peer[0].recv(4).decode('UTF-8')) # Read size prefix (padded to four digits)
-		return peer[0].recv(size)                   # Read data
+		data =  peer[0].recv(size)                  # Read data
+		package = pickle.loads(data)
+
+		return self.callbacks[package.event](package) #
 
 
 	def log(self, msg, level=None):

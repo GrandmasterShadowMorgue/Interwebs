@@ -18,6 +18,8 @@ import socket
 import threading
 import pickle
 
+import Protocols
+
 
 
 class Peer(object):
@@ -39,7 +41,15 @@ class Peer(object):
 		self.running = True
 
 		#
-		self.onreceive = onreceive  #
+		# self.onreceive = onreceive  #
+		self.callbacks = {
+			Event.Data         : lambda package: onreceive(package), # - A Peer is sending data
+			Event.Disconnect   : lambda package: None,               # - A Peer has disconnected
+			Event.Connect      : lambda package: None,               # - A Peer is attempting to connect
+			Event.Verify       : lambda package: None,               # - A Peer verifies that it has received a package
+			Event.Introduce    : lambda package: None,               # - A Peer introduces itself (username, id, etc.)
+			Event.Authenticate : lambda package: None                # - Server is authenticating a peer (currently: sends an ID)
+		}
 
 		#
 		self.address   = (IP, port)     # Port and IP of the server (not the Peer itself)
@@ -88,16 +98,17 @@ class Peer(object):
 				# TODO: Handle blocks
 				size = int(self.socket.recv(4).decode('UTF-8')) # Read size prefix (padded to four digits)
 				data = self.socket.recv(size)                   # Read data
+				package = pickle.loads(data)                    #
 
 				# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. Package.action)
 				self.log('Peer received {0:} bytes from server.'.format(size)) # TODO: Print representation of incoming data (?)
-				self.onreceive(data)
+				self.callbacks[package.event](package) #
+				# self.onreceive(data)
 			except Exception as e:
 				# TODO: Split exception handling when we're done debugging
 				self.log(e)
 				self.log('Lost connection with server')
 				return False # TODO: Meaningful return values (?)
-
 
 		self.log('Client somehow escaped protocol loop')
 
@@ -131,7 +142,7 @@ def main():
 
 	'''
 
-	peer = Peer('localhost', 255, onreceive=lambda data: print('Message: {msg}'.format(msg=pickle.loads(data))))
+	peer = Peer('localhost', 255, onreceive=lambda package: print('Message: {msg}'.format(msg=pickle.loads(package.data))))
 
 	while True:
 		post = input('Say something: ')
