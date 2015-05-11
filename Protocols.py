@@ -25,7 +25,7 @@ import enum
 # Verify       - A Peer verifies that it has received a package
 # Introduce    - A Peer introduces itself (username, id, etc.)
 # Authenticate - Server is authenticating a peer (currently: sends an ID)
-Event = Enum('Event', 'Data Disconnect Connect Verify Introduce Authenticate')
+Event = enum.Enum('Event', 'Data Disconnect Connect Verify Introduce Authenticate')
 
 
 
@@ -54,7 +54,7 @@ class Peer(object):
 	# TODO: Rename to desambiguate (or replace with namedtuple) (?)
 
 	def __init__(self, ID, socket, thread):
-		self.id     = ID     #
+		self.ID     = ID     #
 		self.socket = socket #
 		self.thread = thread #
 		# self.name   = None   #
@@ -69,9 +69,35 @@ def send(self, socket, data, padding):
 	'''
 
 	# TODO: Encode action parameter
-	# TODO: Use Package
+	# TODO: Use Packet
 
 	pass
+
+
+
+def sendRaw(socket, data, padding):
+
+	'''
+	Docstring goes here
+
+	'''
+
+	return socket.send(bytes(('{0:0%dd}' % padding).format(len(data)), 'UTF-8') + data)
+
+
+
+def receive(socket, timeout=0):
+		
+	'''
+	Docstring goes here
+
+	'''
+
+	size = int(socket.recv(4).decode('UTF-8')) # Read size prefix (padded to four digits)
+	data = socket.recv(size)                   # Read data
+	packet = pickle.loads(data)                        #
+
+	return packet
 
 
 

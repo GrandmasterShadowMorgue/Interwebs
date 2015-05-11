@@ -30,9 +30,10 @@ import queue
 import time
 
 import uuid #
-import Enum
+import enum #
 
 import Protocols
+from Protocols import Event
 
 # Testing
 # import 
@@ -60,6 +61,7 @@ class PeerServer(object):
 		'''
 
 		# Configurations
+		self.debug = True
 		self.running = True #
 		self.maximum = 5    # Maximum number of simultaneous peers
 
@@ -75,12 +77,12 @@ class PeerServer(object):
 		# self.onsend    = onsend    # 
 		# self.onreceive = onreceive
 		self.callbacks = {
-			Event.Data         : lambda package: self.broadcast(package), # - A Peer is sending data
-			Event.Disconnect   : lambda package: None, # - A Peer has disconnected
-			Event.Connect      : lambda package: None, # - A Peer is attempting to connect
-			Event.Verify       : lambda package: None, # - A Peer verifies that it has received a package
-			Event.Introduce    : lambda package: None, # - A Peer introduces itself (username, id, etc.)
-			Event.Authenticate : lambda package: None  # - Server is authenticating a peer (currently: sends an ID)
+			Event.Data         : lambda packet: self.broadcast(packet), # - A Peer is sending data
+			Event.Disconnect   : lambda packet: None, # - A Peer has disconnected
+			Event.Connect      : lambda packet: None, # - A Peer is attempting to connect
+			Event.Verify       : lambda packet: None, # - A Peer verifies that it has received a Packet
+			Event.Introduce    : lambda packet: None, # - A Peer introduces itself (username, id, etc.)
+			Event.Authenticate : lambda packet: None  # - Server is authenticating a peer (currently: sends an ID)
 		}
 
 		# 
@@ -117,12 +119,17 @@ class PeerServer(object):
 		# 
 		# TODO: Timeout
 		# TODO: Protocol for adding new peers (initial handshake, eg. assign ID, passwords, username, 'explain' protocol, etc.)
-		self.log('Listening for incoming peers...')
+		self.log('Waiting for incoming peers...')
 
 		sock = self.listenSocket.accept() #
-		peer = Protocols.Peer(id=uuid.uuid1(), socket=sock, thread=self.handshake(sock))
+		peer = Protocols.Peer(ID=uuid.uuid1(), socket=sock, thread=None)
+		peer.thread = self.handshake(peer)
 
-		self.connections[peer.id] = peer #
+		# TODO: How to deal with Server packets
+		# TODO: Flesh out authentication process
+		self.send(peer, Protocols.Packet(event=Event.Authenticate, action=None, sender='Server', data=pickle.dumps(peer.ID), recipients=None))
+
+		self.connections[peer.ID] = peer #
 		self.log('Accepted peer #{0}: {1}'.format(len(self.connections), peer)) # TODO: Printable clients (eg. username, ID)
 
 		return peer
@@ -150,7 +157,7 @@ class PeerServer(object):
 
 		'''
 
-		# TODO: Expect Packages
+		# TODO: Expect packets
 		# TODO: Expect Peers
 
 		# TODO: Unsafe to use multiple threads without syncing (?)
@@ -159,7 +166,8 @@ class PeerServer(object):
 			self.log('Running protocol with {0}'.format(peer))
 			try:
 				# TODO: Handle blocks
-				package = self.receive(peer)
+				packet = self.receive(peer)
+				self.callbacks[packet.event](packet) # TODO: Not sure if this should be here...
 			except Exception as e:
 				self.log(type(e))
 				self.log(e)
@@ -168,10 +176,10 @@ class PeerServer(object):
 				# TODO: Disconnection protocol (eg. tell other peers) (?)
 				return False # TODO: Meaningful return values (?)
 
-			# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. Package.action)
-			self.log('Server received {0:} bytes from {1:}.'.format(size, peer)) # TODO: Print representation of incoming data (?)
+			# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. packet.action)
+			self.log('Server received {0:} bytes from {1:}.'.format(len(packet.data), peer)) # TODO: Print representation of incoming data (?)
 
-			self.broadcast(package)
+			self.broadcast(packet)
 
 
 
@@ -185,19 +193,21 @@ class PeerServer(object):
 		pass
 
 
-	def broadcast(self, package):
+	def broadcast(self, packet):
 
 		'''
 		Docstring goes here
 
 		'''
 
+		print('Broadcasting to IDs: ', *(peer.ID for peer in self.connections.values()))
 		for recipient in self.connections.values():
-				if (recipient.id != package.sender) and (package.recipients is None or recipient.id in package.recipients):
-					self.send(recipient, package)
+				# if (recipient.ID != packet.sender) and (packet.recipients is None or recipient.ID in packet.recipients):
+				if (recipient.ID != packet.sender):
+					self.send(recipient, packet)
 
 
-	def send(self, peer, package):
+	def send(self, peer, packet):
 		
 		'''
 		Send data (raw bytes) to a specific peer.
@@ -210,6 +220,8 @@ class PeerServer(object):
 		# TODO: Handle data sizes greater than 9999
 		# TODO: Configure data size cap (?)
 
+		data = pickle.dumps(packet)
+
 		if len(data) > 9999:
 			self.log('Unable to send more than 9999 bytes of data at a time ({size} is too much)'.format(size=len(data)))
 		else:
@@ -218,7 +230,8 @@ class PeerServer(object):
 			self.log('Server is sending {size} bytes of data to {peer}'.format(size=len(data), peer=peer))
 			# peer.send(bytes('{size:04d}'.format(size=len(data)), encoding='UTF-8'))
 			# peer.send(data)
-			return peer.socket[0].send(bytes('{0:04d}'.format(len(data)), 'UTF-8') + data)
+			# return peer.socket[0].send(bytes('{0:04d}'.format(len(data)), 'UTF-8') + data)
+			return Protocols.sendRaw(peer.socket[0], data, padding=4)
 
 
 	def receive(self, peer):
@@ -228,11 +241,7 @@ class PeerServer(object):
 
 		'''
 
-		size = int(peer[0].recv(4).decode('UTF-8')) # Read size prefix (padded to four digits)
-		data =  peer[0].recv(size)                  # Read data
-		package = pickle.loads(data)
-
-		return self.callbacks[package.event](package) #
+		return Protocols.receive(peer.socket[0])
 
 
 	def log(self, msg, level=None):
@@ -247,7 +256,7 @@ def main():
 
 	'''
 
-	server = PeerServer('localhost', 255, onsend=None, onreceive=None)
+	server = PeerServer('localhost', 255) # , onsend=None, onreceive=None
 	server.start()
 
 

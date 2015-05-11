@@ -19,6 +19,7 @@ import threading
 import pickle
 
 import Protocols
+from Protocols import Event, Packet
 
 
 
@@ -39,16 +40,17 @@ class Peer(object):
 
 		# Configurations
 		self.running = True
+		self.debug   = True
 
 		#
 		# self.onreceive = onreceive  #
 		self.callbacks = {
-			Event.Data         : lambda package: onreceive(package), # - A Peer is sending data
-			Event.Disconnect   : lambda package: None,               # - A Peer has disconnected
-			Event.Connect      : lambda package: None,               # - A Peer is attempting to connect
-			Event.Verify       : lambda package: None,               # - A Peer verifies that it has received a package
-			Event.Introduce    : lambda package: None,               # - A Peer introduces itself (username, id, etc.)
-			Event.Authenticate : lambda package: None                # - Server is authenticating a peer (currently: sends an ID)
+			Event.Data         : lambda packet: onreceive(pickle.loads(packet.data)),  # - A Peer is sending data
+			Event.Disconnect   : lambda packet: None,               # - A Peer has disconnected
+			Event.Connect      : lambda packet: None,               # - A Peer is attempting to connect
+			Event.Verify       : lambda packet: None,               # - A Peer verifies that it has received a packet
+			Event.Introduce    : lambda packet: None,               # - A Peer introduces itself (username, id, etc.)
+			Event.Authenticate : lambda packet: self.authenticate(packet) # - Server is authenticating this peer (currently: sends an ID)
 		}
 
 		#
@@ -56,6 +58,7 @@ class Peer(object):
 		self.socket    = self.connect() # Server socket
 
 		#
+		self.ID     = None
 		self.thread = threading.Thread(target=lambda: self.protocol(), daemon=True).start() #
 
 
@@ -90,22 +93,22 @@ class Peer(object):
 
 		'''
 
-		# TODO: Expect Packages 
+		# TODO: Expect packets 
 
 		while True:
 			self.log('Client running protocol')
 			try:
 				# TODO: Handle blocks
-				size = int(self.socket.recv(4).decode('UTF-8')) # Read size prefix (padded to four digits)
-				data = self.socket.recv(size)                   # Read data
-				package = pickle.loads(data)                    #
+				packet = Protocols.receive(self.socket)
 
-				# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. Package.action)
-				self.log('Peer received {0:} bytes from server.'.format(size)) # TODO: Print representation of incoming data (?)
-				self.callbacks[package.event](package) #
+				# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. packet.action)
+				self.log('Peer received {0} bytes from server.'.format(size)) # TODO: Print representation of incoming data (?)
+				self.callbacks[packet.event](packet) #
 				# self.onreceive(data)
-			except Exception as e:
+			# except Exception as e:
+			except ValueError as e:
 				# TODO: Split exception handling when we're done debugging
+				self.log(type(e))
 				self.log(e)
 				self.log('Lost connection with server')
 				return False # TODO: Meaningful return values (?)
@@ -113,21 +116,38 @@ class Peer(object):
 		self.log('Client somehow escaped protocol loop')
 
 
-	def send(self, data):
+	def authenticate(self, packet):
 
 		'''
 		Docstring goes here
 
 		'''
 
-		# TODO: Use Package
-		# TODO: Custom actions (cf. Package)
+		self.log('Authenticated by server')
+		self.ID = pickle.loads(packet.data) # The ID chosen by the server for this Peer is stored in the data field
+
+
+	def send(self, data, recipients=None):
+
+		'''
+		Docstring goes here
+
+		'''
+
+		# TODO: Use packet
+		# TODO: Custom actions (cf. packet)
 		# TODO: Callback for sending successfully
+
+		# TODO: Use this method for other events too (other than data?)
 
 		# TODO: Move this routine (send data with padded size information) to separate function
 		# self.socket.send(bytes('{size:04d}'.format(size=len(data)), encoding='UTF-8'))
 		# self.socket.send(pickle.dumps(data)) # TODO: Pickle by default (?)
-		return self.socket.send(bytes('{0:04d}'.format(len(data)), 'UTF-8') + data)
+
+		print('Peer ID:', self.ID)
+		packet = Packet(event=Event.Data, action=None, sender=self.ID, data=data, recipients=recipients)
+
+		return Protocols.sendRaw(self.socket, pickle.dumps(packet), padding=4)
 
 
 	def log(self, msg, level=None):
@@ -142,7 +162,11 @@ def main():
 
 	'''
 
-	peer = Peer('localhost', 255, onreceive=lambda package: print('Message: {msg}'.format(msg=pickle.loads(package.data))))
+	def onreceive(data):
+		print('Inside onreceive callback')
+		print('Message: {msg}'.format(msg=data))
+
+	peer = Peer('localhost', 255, onreceive=onreceive)
 
 	while True:
 		post = input('Say something: ')

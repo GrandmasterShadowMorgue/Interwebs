@@ -59,7 +59,7 @@ class ChatClient(object):
 
 		self.entries = []
 
-		self.peer = Peer.Peer('localhost', 255, onreceive=lambda data: self.addEntry(pickle.loads(data)))
+		self.peer = Peer.Peer('localhost', 255, onreceive=lambda data: self.addEntry(data)) #
 
 		#
 		self.window.mainloop()
@@ -72,6 +72,7 @@ class ChatClient(object):
 
 		'''
 
+		self.log('Posting entry: {0}'.format(message))
 		self.addEntry(message)
 		self.peer.send(pickle.dumps(message))
 
