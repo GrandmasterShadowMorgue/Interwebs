@@ -7,7 +7,7 @@
 #
 
 # TODO | - Synchronise calls to send/receive (thread safety) (?)
-#        - 
+#        - Event based API (?)
 
 # SPEC | -
 #        -
@@ -45,7 +45,7 @@ class Peer(object):
 		#
 		# self.onreceive = onreceive  #
 		self.callbacks = {
-			Event.Data         : lambda packet: onreceive(pickle.loads(packet.data)),  # - A Peer is sending data
+			Event.Data         : lambda packet: onreceive(pickle.loads(packet.data)),  # - A Peer is sending data (give clients access to the entire packet?)
 			Event.Disconnect   : lambda packet: None,               # - A Peer has disconnected
 			Event.Connect      : lambda packet: None,               # - A Peer is attempting to connect
 			Event.Verify       : lambda packet: None,               # - A Peer verifies that it has received a packet
@@ -102,7 +102,7 @@ class Peer(object):
 				packet = Protocols.receive(self.socket)
 
 				# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. packet.action)
-				self.log('Peer received {0} bytes from server.'.format(size)) # TODO: Print representation of incoming data (?)
+				self.log('Peer received {0} bytes from server.'.format(len(packet.data))) # TODO: Print representation of incoming data (?)
 				self.callbacks[packet.event](packet) #
 				# self.onreceive(data)
 			# except Exception as e:
@@ -144,7 +144,7 @@ class Peer(object):
 		# self.socket.send(bytes('{size:04d}'.format(size=len(data)), encoding='UTF-8'))
 		# self.socket.send(pickle.dumps(data)) # TODO: Pickle by default (?)
 
-		print('Peer ID:', self.ID)
+		print('Peer is sending data (ID={0})'.format(self.ID))
 		packet = Packet(event=Event.Data, action=None, sender=self.ID, data=data, recipients=recipients)
 
 		return Protocols.sendRaw(self.socket, pickle.dumps(packet), padding=4)

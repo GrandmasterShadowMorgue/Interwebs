@@ -16,6 +16,7 @@
 
 import time
 import enum
+import pickle
 
 
 
@@ -82,6 +83,8 @@ def sendRaw(socket, data, padding):
 
 	'''
 
+	print('Sending {0} bytes of data from socket {1} with padding {2}'.format(len(data), socket, padding))
+	print('{0:0%dd}' % padding)
 	return socket.send(bytes(('{0:0%dd}' % padding).format(len(data)), 'UTF-8') + data)
 
 
@@ -95,7 +98,7 @@ def receive(socket, timeout=0):
 
 	size = int(socket.recv(4).decode('UTF-8')) # Read size prefix (padded to four digits)
 	data = socket.recv(size)                   # Read data
-	packet = pickle.loads(data)                        #
+	packet = pickle.loads(data)                #
 
 	return packet
 

@@ -16,6 +16,7 @@
 #        - Command line interface (?)
 #        - Proper logging
 #        - Move common utilities to separate module
+#        - Match ID to socket object (?)
 
 # SPEC | -
 #        -
@@ -61,7 +62,7 @@ class PeerServer(object):
 		'''
 
 		# Configurations
-		self.debug = True
+		self.debug   = True
 		self.running = True #
 		self.maximum = 5    # Maximum number of simultaneous peers
 
@@ -130,7 +131,7 @@ class PeerServer(object):
 		self.send(peer, Protocols.Packet(event=Event.Authenticate, action=None, sender='Server', data=pickle.dumps(peer.ID), recipients=None))
 
 		self.connections[peer.ID] = peer #
-		self.log('Accepted peer #{0}: {1}'.format(len(self.connections), peer)) # TODO: Printable clients (eg. username, ID)
+		self.log('Accepted peer #{0}: {1}\n\n'.format(len(self.connections), peer.ID)) # TODO: Printable clients (eg. username, ID)
 
 		return peer
 
@@ -163,23 +164,26 @@ class PeerServer(object):
 		# TODO: Unsafe to use multiple threads without syncing (?)
 
 		while True:
-			self.log('Running protocol with {0}'.format(peer))
+			self.log('Running protocol with {0}'.format(peer.ID))
 			try:
 				# TODO: Handle blocks
 				packet = self.receive(peer)
+				# self.log('\n\nReceived data from peer {0}'.format(peer.ID))
+				self.log('\n\nServer received {0:} bytes from {1:} ({2!r}).'.format(len(packet.data), peer.ID, packet.event)) # TODO: Print representation of incoming data (?)
 				self.callbacks[packet.event](packet) # TODO: Not sure if this should be here...
+			# except ConnectionResetError
 			except Exception as e:
 				self.log(type(e))
 				self.log(e)
-				self.log('Lost connection with {0:}.'.format(peer))
+				self.log('Lost connection with {0:}.'.format(peer.ID))
 				# TODO: Remove peer from list
 				# TODO: Disconnection protocol (eg. tell other peers) (?)
 				return False # TODO: Meaningful return values (?)
 
 			# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. packet.action)
-			self.log('Server received {0:} bytes from {1:}.'.format(len(packet.data), peer)) # TODO: Print representation of incoming data (?)
+			# self.log('Server received {0:} bytes from {1:}.'.format(len(packet.data), peer)) # TODO: Print representation of incoming data (?)
 
-			self.broadcast(packet)
+			# self.broadcast(packet)
 
 
 
@@ -200,11 +204,13 @@ class PeerServer(object):
 
 		'''
 
-		print('Broadcasting to IDs: ', *(peer.ID for peer in self.connections.values()))
-		for recipient in self.connections.values():
+		assert all(ID == peer.ID for ID, peer in self.connections.items()), 'Strange...'
+		recipients = lambda: (recipient for recipient in self.connections.values() if recipient.ID != packet.sender)
+		print('Broadcasting to {0} peers.'.format(sum(1 for r in recipients())))
+
+		for recipient in recipients():
 				# if (recipient.ID != packet.sender) and (packet.recipients is None or recipient.ID in packet.recipients):
-				if (recipient.ID != packet.sender):
-					self.send(recipient, packet)
+				self.send(recipient, packet)
 
 
 	def send(self, peer, packet):
@@ -227,7 +233,7 @@ class PeerServer(object):
 		else:
 			# TODO: Safe to send in two separate calls (?)
 			# TODO: Inefficient to concatenate bytes (use bytearray?)
-			self.log('Server is sending {size} bytes of data to {peer}'.format(size=len(data), peer=peer))
+			self.log('Server is sending {size} bytes of data to {peer}'.format(size=len(data), peer=peer.ID))
 			# peer.send(bytes('{size:04d}'.format(size=len(data)), encoding='UTF-8'))
 			# peer.send(data)
 			# return peer.socket[0].send(bytes('{0:04d}'.format(len(data)), 'UTF-8') + data)

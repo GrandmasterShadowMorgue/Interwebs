@@ -49,10 +49,14 @@ class ChatClient(object):
 		# self.window.geometry('{width}x{height}'.format(width=self.size[0], height=self.size[1]))
 		self.window.title('Chat')
 
+		def onsubmit(ev):
+			print('onsubmit')
+			self.postEntry(self.write.get())
+
 		# Create the interface
 		self.write = ttk.Entry()
 		self.write.grid(column=0, row=1)
-		self.write.bind('<Return>', lambda e: self.postEntry(self.write.get()))
+		self.write.bind('<Return>', onsubmit)
 
 		self.entryFrame = ttk.Frame() # width=self.size[0], height=self.size[1]-30
 		self.entryFrame.grid(column=0, row=0)
@@ -84,7 +88,7 @@ class ChatClient(object):
 
 		'''
 
-		self.log('Received message: {0}'.format(message))
+		self.log('Adding entry: {0}'.format(message))
 		entry = ttk.Label(master=self.entryFrame, text=time.strftime('(%H:%M:%S) {0}', time.localtime()).format(message))
 		entry.grid(column=0, row=len(self.entries))
 		self.entries.append(entry)
