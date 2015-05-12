@@ -279,7 +279,7 @@ def main():
 
 	'''
 
-	server = PeerServer('192.168.1.88', 12345) # , onsend=None, onreceive=None
+	server = PeerServer(('localhost', '192.168.1.88')[0], 12345) # , onsend=None, onreceive=None
 	server.start()
 
 

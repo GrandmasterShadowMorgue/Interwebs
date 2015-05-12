@@ -215,7 +215,7 @@ class Platformer(object):
 		self.window.bind('<KeyRelease-p>', lambda e: self.play(toggle=True)) # Start the game when player presses spacebar
 
 		#
-		self.peer = Peer.Peer('192.168.1.88', 12345, onreceive=lambda sender, data: self.updateRemotePlayer(sender, data),
+		self.peer = Peer.Peer(('localhost', '192.168.1.88')[0], 12345, onreceive=lambda sender, data: self.updateRemotePlayer(sender, data),
 		                                        onconnect=lambda sender, data: self.addNewPlayer(sender, data),
 		                                        onauthenticated=lambda ID: self.peer.send(data=pickle.dumps((self.player.name, self.player.p, self.player.size, self.player.fill)),
 		                                                                                  event=Event.Connect)) #
