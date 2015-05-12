@@ -117,7 +117,7 @@ class Platformer(object):
 		# TODO: Encapsulate updates (?)
 		# TODO: Encapsulate graphical updates (?)
 		# TODO: How to pickle (?)
-		def __init__(self, name, x, y, size, canvas):
+		def __init__(self, name, x, y, size, fill, canvas):
 			self.name = name # Name as a string
 			self.jumping = False #
 
@@ -129,6 +129,7 @@ class Platformer(object):
 
 			self.size = size # Size (m : vector)
 
+			self.fill = fill #
 			self.visuals = self.createVisuals(canvas)
 
 		def velocity(self, v, add=False):
@@ -156,7 +157,7 @@ class Platformer(object):
 			canvas.itemconfig(self.visuals['nametag'], text='{name} {pos}'.format(name=self.name, pos=self.p))
 
 		def createVisuals(self, canvas):
-			return { 'body':    canvas.create_rectangle(self.bounds(normalise=int), fill='#FB00EC', width=0),
+			return { 'body':    canvas.create_rectangle(self.bounds(normalise=int), fill=self.fill, width=0),
 		             'nametag': canvas.create_text(self.label(), text=self.name, anchor=tk.CENTER) }
 
 
@@ -188,7 +189,9 @@ class Platformer(object):
 		self.player = Platformer.Player(name=random.choice(('Jonatan', 'Ali Baba', 'Ser Devon', 'Jayant')),
 			                            x=random.randint(20, self.size[0]-20),
 			                            y=self.size[1]-self.groundlevel-30/2,
-			                            size=18+30j, canvas=self.canvas)
+			                            size=18+30j,
+			                            fill=random.choice(('#F35678', '#FB00EC', '#FF8C69', '#EED5D2', '#71C671', '#5E2612', '#DAA520', '#9ACD32')),
+			                            canvas=self.canvas)
 
 		self.others = {} # Other players
 
@@ -206,9 +209,9 @@ class Platformer(object):
 		self.window.bind('<KeyRelease-p>', lambda e: self.play(toggle=True)) # Start the game when player presses spacebar
 
 		#
-		self.peer = Peer.Peer('localhost', 255, onreceive=lambda sender, data: self.updateRemotePlayer(sender, data),
+		self.peer = Peer.Peer('192.168.1.88', 12345, onreceive=lambda sender, data: self.updateRemotePlayer(sender, data),
 		                                        onconnect=lambda sender, data: self.addNewPlayer(sender, data),
-		                                        onauthenticated=lambda ID: self.peer.send(data=pickle.dumps((self.player.name, self.player.p, self.player.size)),
+		                                        onauthenticated=lambda ID: self.peer.send(data=pickle.dumps((self.player.name, self.player.p, self.player.size, self.player.fill)),
 		                                                                                  event=Event.Connect)) #
 
 		#
@@ -254,7 +257,8 @@ class Platformer(object):
 
 		# TODO: Use namedtuple instead (?)
 		# data.name, data.p.real, data.p.imag, self.size, self.canvas
-		self.others[ID] = Platformer.Player(data[0], data[1].real, data[1].imag, data[2], self.canvas)
+		self.others[ID] = Platformer.Player(data[0], data[1].real, data[1].imag, data[2], data[3], self.canvas)
+
 		# self.others[ID].visuals = self.others[ID].createVisuals(self.canvas)
 
 
