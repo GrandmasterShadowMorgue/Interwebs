@@ -25,6 +25,8 @@ import time
 
 import random
 
+from Protocols import Event
+
 
 
 class ChatClient(object):
@@ -65,7 +67,7 @@ class ChatClient(object):
 
 		self.entries = []
 
-		self.peer = Peer.Peer('localhost', 255, onreceive=lambda data: self.addEntry(data)) #
+		self.peer = Peer.Peer('localhost', 255, onreceive=lambda sender, data: self.addEntry(data), onconnect=lambda sender, data: None) #
 
 		#
 		self.window.mainloop()
@@ -114,7 +116,8 @@ class Platformer(object):
 	class Player(object):
 		# TODO: Encapsulate updates (?)
 		# TODO: Encapsulate graphical updates (?)
-		def __init__(self, name, x, y, size):
+		# TODO: How to pickle (?)
+		def __init__(self, name, x, y, size, canvas):
 			self.name = name # Name as a string
 			self.jumping = False #
 
@@ -125,6 +128,8 @@ class Platformer(object):
 			self.f = {'gravity': 0+9.82j, 'normal': 0+9.82j} # Forces (N : vector)
 
 			self.size = size # Size (m : vector)
+
+			self.visuals = self.createVisuals(canvas)
 
 		def velocity(self, v, add=False):
 			self.v = self.v + v if add else v
@@ -145,6 +150,15 @@ class Platformer(object):
 		def animate(self, dt):
 			self.p += self.v * dt # TODO: Proper physics/forces/collisions/etc.
 
+		def render(self, canvas):
+			canvas.coords(self.visuals['body'], self.bounds(normalise=int))
+			canvas.coords(self.visuals['nametag'], self.label())
+			canvas.itemconfig(self.visuals['nametag'], text='{name} {pos}'.format(name=self.name, pos=self.p))
+
+		def createVisuals(self, canvas):
+			return { 'body':    canvas.create_rectangle(self.bounds(normalise=int), fill='#FB00EC', width=0),
+		             'nametag': canvas.create_text(self.label(), text=self.name, anchor=tk.CENTER) }
+
 
 	def __init__(self):
 
@@ -164,19 +178,19 @@ class Platformer(object):
 
 		# World
 		self.groundlevel = 40
-		self.player = Platformer.Player(name=random.choice(('Jonatan', 'Ali Baba', 'Ser Devon')),
-			                            x=random.randint(20, self.size[0]-20),
-			                            y=self.size[1]-self.groundlevel-30/2,
-			                            size=18+30j)
-
-		self.others = {} # Other players
 
 		# Canvas
 		self.canvas = tk.Canvas(width=self.size[0], height=self.size[1])
 		self.ground = self.canvas.create_rectangle((0, self.size[1]-self.groundlevel, self.size[0], self.size[0]), fill='#45DE9F', width=0)
-		self.player.visual = { 'body':    self.canvas.create_rectangle(self.player.bounds(normalise=int), fill='#FB00EC', width=0),
-		                       'nametag': self.canvas.create_text(self.player.label(), text=self.player.name, anchor=tk.CENTER) }
 		self.canvas.pack()
+
+		# Players
+		self.player = Platformer.Player(name=random.choice(('Jonatan', 'Ali Baba', 'Ser Devon', 'Jayant')),
+			                            x=random.randint(20, self.size[0]-20),
+			                            y=self.size[1]-self.groundlevel-30/2,
+			                            size=18+30j, canvas=self.canvas)
+
+		self.others = {} # Other players
 
 		# Animation
 		self.running = False #
@@ -192,7 +206,10 @@ class Platformer(object):
 		self.window.bind('<KeyRelease-p>', lambda e: self.play(toggle=True)) # Start the game when player presses spacebar
 
 		#
-		# self.peer = Peer.Peer('localhost', 255, onreceive=lambda data: updateRemotePlayers(data)) #
+		self.peer = Peer.Peer('localhost', 255, onreceive=lambda sender, data: self.updateRemotePlayer(sender, data),
+		                                        onconnect=lambda sender, data: self.addNewPlayer(sender, data),
+		                                        onauthenticated=lambda ID: self.peer.send(data=pickle.dumps((self.player.name, self.player.p, self.player.size)),
+		                                                                                  event=Event.Connect)) #
 
 		#
 		self.window.mainloop()
@@ -216,11 +233,29 @@ class Platformer(object):
 			self.window.after(int(1000/self.FPS), lambda: self.tick())
 
 		self.player.animate(1.0/self.FPS)
-		self.canvas.coords(self.player.visual['body'], self.player.bounds(normalise=int))
-		self.canvas.coords(self.player.visual['nametag'], self.player.label())
+		self.player.render(self.canvas)
+
+		for other in self.others.values():
+			other.render(self.canvas)
+
 		self.notifyServer()
 
 		self.window.after(int(1000/self.FPS), lambda: self.tick())
+
+
+	def addNewPlayer(self, ID, data):
+
+		'''
+		Docstring goes here
+
+		'''
+
+		print('Adding new player {0}: {1}'.format(ID, data))
+
+		# TODO: Use namedtuple instead (?)
+		# data.name, data.p.real, data.p.imag, self.size, self.canvas
+		self.others[ID] = Platformer.Player(data[0], data[1].real, data[1].imag, data[2], self.canvas)
+		# self.others[ID].visuals = self.others[ID].createVisuals(self.canvas)
 
 
 	def notifyServer(self):
@@ -230,17 +265,19 @@ class Platformer(object):
 
 		'''
 
-		pass
+		# TODO: Optimise (eg. no updates when player isn't moving)
+		self.peer.send(pickle.dumps(self.player.p))
 
 
-	def updateRemotePlayers(self, data):
+	def updateRemotePlayer(self, ID, data):
 
 		'''
 		Docstring goes here
 
 		'''
 
-		pass
+		print('\nUpdating remote player ({ID}, {data})\n'.format(ID=ID, data=data))
+		self.others[ID].p = data #
 
 
 

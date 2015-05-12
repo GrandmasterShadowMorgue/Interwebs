@@ -31,7 +31,7 @@ class Peer(object):
 	'''
 
 
-	def __init__(self, IP, port, onreceive):
+	def __init__(self, IP, port, onreceive, onconnect, onauthenticated=None):
 
 		'''
 		Docstring goes here
@@ -44,12 +44,14 @@ class Peer(object):
 
 		#
 		# self.onreceive = onreceive  #
+		# TODO: Use callbacks.update to override default callbacks (?)
+		self.onauthenticated = onauthenticated or (lambda ID: print('Peer {0} has been authenticated'.format(ID)))
 		self.callbacks = {
-			Event.Data         : lambda packet: onreceive(pickle.loads(packet.data)),  # - A Peer is sending data (give clients access to the entire packet?)
-			Event.Disconnect   : lambda packet: None,               # - A Peer has disconnected
-			Event.Connect      : lambda packet: None,               # - A Peer is attempting to connect
-			Event.Verify       : lambda packet: None,               # - A Peer verifies that it has received a packet
-			Event.Introduce    : lambda packet: None,               # - A Peer introduces itself (username, id, etc.)
+			Event.Data         : lambda packet: onreceive(packet.sender, pickle.loads(packet.data)), # - A Peer is sending data (give clients access to the entire packet?)
+			Event.Disconnect   : lambda packet: None,                                                # - A Peer has disconnected
+			Event.Connect      : lambda packet: onconnect(packet.sender, pickle.loads(packet.data)), # - A Peer is attempting to connect (eg. ANOTHER peer)
+			Event.Verify       : lambda packet: None,                                                # - A Peer verifies that it has received a packet
+			Event.Introduce    : lambda packet: None,                                                # - A Peer introduces itself (username, id, etc.)
 			Event.Authenticate : lambda packet: self.authenticate(packet) # - Server is authenticating this peer (currently: sends an ID)
 		}
 
@@ -102,7 +104,7 @@ class Peer(object):
 				packet = Protocols.receive(self.socket)
 
 				# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. packet.action)
-				self.log('Peer received {0} bytes from server.'.format(len(packet.data))) # TODO: Print representation of incoming data (?)
+				self.log('Peer received {0} bytes from server ({1}).'.format(len(packet.data), packet.event)) # TODO: Print representation of incoming data (?)
 				self.callbacks[packet.event](packet) #
 				# self.onreceive(data)
 			# except Exception as e:
@@ -125,9 +127,10 @@ class Peer(object):
 
 		self.log('Authenticated by server')
 		self.ID = pickle.loads(packet.data) # The ID chosen by the server for this Peer is stored in the data field
+		self.onauthenticated(self.ID)
 
 
-	def send(self, data, recipients=None):
+	def send(self, data, event=Event.Data, recipients=None):
 
 		'''
 		Docstring goes here
@@ -144,8 +147,8 @@ class Peer(object):
 		# self.socket.send(bytes('{size:04d}'.format(size=len(data)), encoding='UTF-8'))
 		# self.socket.send(pickle.dumps(data)) # TODO: Pickle by default (?)
 
-		print('Peer is sending data (ID={0})'.format(self.ID))
-		packet = Packet(event=Event.Data, action=None, sender=self.ID, data=data, recipients=recipients)
+		print('Peer is sending data (ID={0}, event={1})'.format(self.ID, event))
+		packet = Packet(event=event, action=None, sender=self.ID, data=data, recipients=recipients)
 
 		return Protocols.sendRaw(self.socket, pickle.dumps(packet), padding=4)
 
@@ -166,7 +169,7 @@ def main():
 		print('Inside onreceive callback')
 		print('Message: {msg}'.format(msg=data))
 
-	peer = Peer('localhost', 255, onreceive=onreceive)
+	peer = Peer('localhost', 255, onreceive=onreceive, onconnect=lambda *args: None)
 
 	while True:
 		post = input('Say something: ')

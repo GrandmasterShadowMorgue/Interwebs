@@ -77,12 +77,13 @@ class PeerServer(object):
 		# self.protocol  = protocol #
 		# self.onsend    = onsend    # 
 		# self.onreceive = onreceive
+		self.introductions = [] # A list of introductions from each peer
 		self.callbacks = {
 			Event.Data         : lambda packet: self.broadcast(packet), # - A Peer is sending data
 			Event.Disconnect   : lambda packet: None, # - A Peer has disconnected
-			Event.Connect      : lambda packet: None, # - A Peer is attempting to connect
-			Event.Verify       : lambda packet: None, # - A Peer verifies that it has received a Packet
+			Event.Connect      : lambda packet: self.notifyNewPeer(packet), # - A Peer is attempting to connect
 			Event.Introduce    : lambda packet: None, # - A Peer introduces itself (username, id, etc.)
+			Event.Verify       : lambda packet: None, # - A Peer verifies that it has received a Packet
 			Event.Authenticate : lambda packet: None  # - Server is authenticating a peer (currently: sends an ID)
 		}
 
@@ -130,6 +131,11 @@ class PeerServer(object):
 		# TODO: Flesh out authentication process
 		self.send(peer, Protocols.Packet(event=Event.Authenticate, action=None, sender='Server', data=pickle.dumps(peer.ID), recipients=None))
 
+		# Send previous introductions to newly connected peer (use Event.Introduce event instead)
+		# TODO: Use dict for introductions (easier to remove when peer disconnects)
+		for introduction in self.introductions:
+			self.send(peer, introduction)
+			
 		self.connections[peer.ID] = peer #
 		self.log('Accepted peer #{0}: {1}\n\n'.format(len(self.connections), peer.ID)) # TODO: Printable clients (eg. username, ID)
 
@@ -195,6 +201,17 @@ class PeerServer(object):
 		'''
 
 		pass
+
+
+	def notifyNewPeer(self, packet):
+	
+		'''
+		Docstring goes here
+	
+		'''
+	
+		self.introductions.append(packet)
+		self.broadcast(packet)
 
 
 	def broadcast(self, packet):

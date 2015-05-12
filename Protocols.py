@@ -83,8 +83,8 @@ def sendRaw(socket, data, padding):
 
 	'''
 
-	print('Sending {0} bytes of data from socket {1} with padding {2}'.format(len(data), socket, padding))
-	print('{0:0%dd}' % padding)
+	# print('Sending {0} bytes of data from socket {1} with padding {2}'.format(len(data), socket, padding))
+	# print('{0:0%dd}' % padding)
 	return socket.send(bytes(('{0:0%dd}' % padding).format(len(data)), 'UTF-8') + data)
 
 
