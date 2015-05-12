@@ -117,10 +117,9 @@ class Platformer(object):
 		# TODO: Encapsulate updates (?)
 		# TODO: Encapsulate graphical updates (?)
 		# TODO: How to pickle (?)
-		def __init__(self, name, x, y, size, fill, canvas):
+		def __init__(self, name, x, y, size, fill, canvas, arrow=tk.NORMAL):
 			self.name = name # Name as a string
 			self.jumping = False #
-
 
 			self.p = x+1j*y  # Position (m   : vector)
 			self.v = 0+0j    # Velocity (m/s : vector)
@@ -130,7 +129,7 @@ class Platformer(object):
 			self.size = size # Size (m : vector)
 
 			self.fill = fill #
-			self.visuals = self.createVisuals(canvas)
+			self.visuals = self.createVisuals(canvas, arrow)
 
 		def velocity(self, v, add=False):
 			self.v = self.v + v if add else v
@@ -140,8 +139,11 @@ class Platformer(object):
 			bottomright = self.p+self.size/2
 			return  (normalise(topleft.real), normalise(topleft.imag), normalise(bottomright.real), normalise(bottomright.imag))
 
-		def label(self, coords=False):
-			return (self.p.real, self.p.imag-self.size.imag/2-10)
+		def label(self, coords=False, normalise=lambda x: x):
+			return (normalise(self.p.real), normalise(self.p.imag-self.size.imag/2-10)) # TODO: Don't hardcode distance (10)
+
+		def arrow(self, length, pady):
+			return (self.p.real, self.p.imag-self.size.imag/2-length-pady, self.p.real, self.p.imag-self.size.imag/2-pady)
 
 		def jump(self, v):
 			self.v += v
@@ -149,16 +151,20 @@ class Platformer(object):
 			# self.f['normal'] = 0+0j
 
 		def animate(self, dt):
+			past = self.p
 			self.p += self.v * dt # TODO: Proper physics/forces/collisions/etc.
+			return past
 
 		def render(self, canvas):
 			canvas.coords(self.visuals['body'], self.bounds(normalise=int))
 			canvas.coords(self.visuals['nametag'], self.label())
 			canvas.itemconfig(self.visuals['nametag'], text='{name} {pos}'.format(name=self.name, pos=self.p))
+			canvas.coords(self.visuals['arrow'], self.arrow(length=18, pady=25+8))
 
-		def createVisuals(self, canvas):
+		def createVisuals(self, canvas, arrow):
 			return { 'body':    canvas.create_rectangle(self.bounds(normalise=int), fill=self.fill, width=0),
-		             'nametag': canvas.create_text(self.label(), text=self.name, anchor=tk.CENTER) }
+		             'nametag': canvas.create_text(self.label(), text=self.name, anchor=tk.CENTER, fill='#C9C9C9'),
+		             'arrow':   canvas.create_line(self.arrow(length=18, pady=25+8), width=14, fill='#89DF0D', state=arrow, arrow='last') }
 
 
 	def __init__(self):
@@ -235,13 +241,14 @@ class Platformer(object):
 		if not self.running:
 			self.window.after(int(1000/self.FPS), lambda: self.tick())
 
-		self.player.animate(1.0/self.FPS)
+		past = self.player.animate(1.0/self.FPS)
 		self.player.render(self.canvas)
 
 		for other in self.others.values():
 			other.render(self.canvas)
 
-		self.notifyServer()
+		if past != self.player.p:
+			self.notifyServer()
 
 		self.window.after(int(1000/self.FPS), lambda: self.tick())
 
@@ -257,7 +264,7 @@ class Platformer(object):
 
 		# TODO: Use namedtuple instead (?)
 		# data.name, data.p.real, data.p.imag, self.size, self.canvas
-		self.others[ID] = Platformer.Player(data[0], data[1].real, data[1].imag, data[2], data[3], self.canvas)
+		self.others[ID] = Platformer.Player(data[0], data[1].real, data[1].imag, data[2], data[3], self.canvas, tk.HIDDEN)
 
 		# self.others[ID].visuals = self.others[ID].createVisuals(self.canvas)
 
