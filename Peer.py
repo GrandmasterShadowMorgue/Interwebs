@@ -147,7 +147,7 @@ class Peer(object):
 		# self.socket.send(bytes('{size:04d}'.format(size=len(data)), encoding='UTF-8'))
 		# self.socket.send(pickle.dumps(data)) # TODO: Pickle by default (?)
 
-		print('Peer is sending data (ID={0}, event={1})'.format(self.ID, event))
+		# print('Peer is sending data (ID={0}, event={1})'.format(self.ID, event))
 		packet = Packet(event=event, action=None, sender=self.ID, data=data, recipients=recipients)
 
 		return Protocols.sendRaw(self.socket, pickle.dumps(packet), padding=4)

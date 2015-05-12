@@ -111,12 +111,13 @@ class Platformer(object):
 	'''
 
 	# TODO: Refactor (logic/graphics/network)
-	# TODO: Separate coordinate system
+	# TODO: Separate coordinate system (world/screen)
 
 	class Player(object):
 		# TODO: Encapsulate updates (?)
 		# TODO: Encapsulate graphical updates (?)
 		# TODO: How to pickle (?)
+		# TODO: Use namedtuple or class for bounds and points
 		def __init__(self, name, x, y, size, fill, canvas, arrow=tk.NORMAL):
 			self.name = name # Name as a string
 			self.jumping = False #
@@ -132,6 +133,7 @@ class Platformer(object):
 			self.visuals = self.createVisuals(canvas, arrow)
 
 		def velocity(self, v, add=False):
+			print('Setting velocity')
 			self.v = self.v + v if add else v
 
 		def bounds(self, normalise=lambda x: x):
@@ -146,13 +148,27 @@ class Platformer(object):
 			return (self.p.real, self.p.imag-self.size.imag/2-length-pady, self.p.real, self.p.imag-self.size.imag/2-pady)
 
 		def jump(self, v):
-			self.v += v
-			self.jumping = True
-			# self.f['normal'] = 0+0j
+			if not self.jumping:
+				print('Jump')
+				self.v += v
+				self.jumping = True
+				# self.f['normal'] = 0+0j
 
 		def animate(self, dt):
+			# TODO: Encapsulate collisions (?)
 			past = self.p
-			self.p += self.v * dt # TODO: Proper physics/forces/collisions/etc.
+			# self.p += self.v * dt # TODO: Proper physics/forces/collisions/etc.
+			a = 9.82j if self.jumping else 0
+			self.p += (lambda p, v, a: (v*dt + (1/2)*a*dt**2))(self.p.real, self.v.real, a.real)   # Horizontal motion (self.a.real)
+			self.p += (lambda p, v, a: (v*dt + (1/2)*a*dt**2))(self.p.imag, self.v.imag, a.imag)*1j # Vertical motion
+			self.v += a*dt
+
+			# TODO: Don't hardcode groundlevel
+			if self.jumping and (self.p.imag >= (480 - 40 - self.size.imag/2)):
+				self.p = self.p.real+(480j - 40j - (self.size.imag/2)*1j)
+				self.v = self.v.real
+				self.jumping = False
+
 			return past
 
 		def render(self, canvas):
@@ -206,12 +222,14 @@ class Platformer(object):
 		self.FPS = 30        # Frames per second
 		
 		# Key bindings
-		self.window.bind('<KeyPress-Left>',  lambda e: self.player.velocity(v=-90.0+0j, add=False))
-		self.window.bind('<KeyPress-Right>', lambda e: self.player.velocity(v= 90.0+0j, add=False))
+		self.window.bind('<KeyPress-Left>',  lambda e: self.player.velocity(v=-90-self.player.v.real, add=True))
+		self.window.bind('<KeyPress-Right>', lambda e: self.player.velocity(v= 90-self.player.v.real, add=True))
 		
-		self.window.bind('<KeyRelease-Left>',  lambda e: self.player.velocity(v=0+0j, add=False))
-		self.window.bind('<KeyRelease-Right>', lambda e: self.player.velocity(v=0+0j, add=False))
+		self.window.bind('<KeyRelease-Left>',  lambda e: self.player.velocity(v=-self.player.v.real, add=True))
+		self.window.bind('<KeyRelease-Right>', lambda e: self.player.velocity(v=-self.player.v.real, add=True))
 		
+		self.window.bind('<space>', lambda e: self.player.jump(-40j)) # TODO: No double-jumping
+
 		self.window.bind('<KeyRelease-p>', lambda e: self.play(toggle=True)) # Start the game when player presses spacebar
 
 		#
