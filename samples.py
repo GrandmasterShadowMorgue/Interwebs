@@ -114,14 +114,28 @@ class Platformer(object):
 	class Player(object):
 		# TODO: Encapsulate updates (?)
 		# TODO: Encapsulate graphical updates (?)
-		def __init__(self, name, x, y):
+		def __init__(self, name, x, y, size):
 			self.name = name # Name as a string
 			self.jumping = False #
+
 
 			self.p = x+1j*y  # Position (m   : vector)
 			self.v = 0+0j    # Velocity (m/s : vector)
 			self.m = 1       # Mass     (kg  : scalar)
 			self.f = {'gravity': 0+9.82j, 'normal': 0+9.82j} # Forces (N : vector)
+
+			self.size = size # Size (m : vector)
+
+		def velocity(self, v, add=False):
+			self.v = self.v + v if add else v
+
+		def bounds(self, normalise=lambda x: x):
+			topleft     = self.p-self.size/2
+			bottomright = self.p+self.size/2
+			return  (normalise(topleft.real), normalise(topleft.imag), normalise(bottomright.real), normalise(bottomright.imag))
+
+		def label(self, coords=False):
+			return (self.p.real, self.p.imag-self.size.imag/2-10)
 
 		def jump(self, v):
 			self.v += v
@@ -150,18 +164,45 @@ class Platformer(object):
 
 		# World
 		self.groundlevel = 40
-		self.player = Player(random.choice(('Jonatan', 'Ali Baba', 'Ser Devon')), x=random.randint)
+		self.player = Platformer.Player(name=random.choice(('Jonatan', 'Ali Baba', 'Ser Devon')),
+			                            x=random.randint(20, self.size[0]-20),
+			                            y=self.size[1]-self.groundlevel-30/2,
+			                            size=18+30j)
+
+		self.others = {} # Other players
 
 		# Canvas
 		self.canvas = tk.Canvas(width=self.size[0], height=self.size[1])
-		self.ground = self.canvas.create_rectangle((0, self.size[1]-groundlevel, self.size[0], self.size[0]), fill='#45DE9F', width=0)
+		self.ground = self.canvas.create_rectangle((0, self.size[1]-self.groundlevel, self.size[0], self.size[0]), fill='#45DE9F', width=0)
+		self.player.visual = { 'body':    self.canvas.create_rectangle(self.player.bounds(normalise=int), fill='#FB00EC', width=0),
+		                       'nametag': self.canvas.create_text(self.player.label(), text=self.player.name, anchor=tk.CENTER) }
 		self.canvas.pack()
 
+		# Animation
+		self.running = False #
+		self.FPS = 30        # Frames per second
+		
+		# Key bindings
+		self.window.bind('<KeyPress-Left>',  lambda e: self.player.velocity(v=-90.0+0j, add=False))
+		self.window.bind('<KeyPress-Right>', lambda e: self.player.velocity(v= 90.0+0j, add=False))
+		
+		self.window.bind('<KeyRelease-Left>',  lambda e: self.player.velocity(v=0+0j, add=False))
+		self.window.bind('<KeyRelease-Right>', lambda e: self.player.velocity(v=0+0j, add=False))
+		
+		self.window.bind('<KeyRelease-p>', lambda e: self.play(toggle=True)) # Start the game when player presses spacebar
+
 		#
-		self.peer = Peer.Peer('localhost', 255, onreceive=lambda data: updateRemotePlayers(data)) #
+		# self.peer = Peer.Peer('localhost', 255, onreceive=lambda data: updateRemotePlayers(data)) #
 
 		#
 		self.window.mainloop()
+
+
+	def play(self, toggle=False):
+		self.running = not self.running if toggle else True
+		print('Game is now {0}.'.format(('paused', 'running')[self.running]))
+		if self.running:
+			self.tick() #
 
 
 	def tick(self):
@@ -171,7 +212,15 @@ class Platformer(object):
 
 		'''
 
+		if not self.running:
+			self.window.after(int(1000/self.FPS), lambda: self.tick())
+
+		self.player.animate(1.0/self.FPS)
+		self.canvas.coords(self.player.visual['body'], self.player.bounds(normalise=int))
+		self.canvas.coords(self.player.visual['nametag'], self.player.label())
 		self.notifyServer()
+
+		self.window.after(int(1000/self.FPS), lambda: self.tick())
 
 
 	def notifyServer(self):
