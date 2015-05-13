@@ -206,7 +206,7 @@ class Platformer(object):
 		# Create the window
 		self.window = tk.Tk()
 		self.window.geometry('{width}x{height}'.format(width=self.size[0], height=self.size[1]))
-		self.window.title('Platformer')
+		self.window.title('Platformer (paused)') #
 
 		# World
 		self.groundlevel = 40
@@ -286,7 +286,7 @@ class Platformer(object):
 
 	def play(self, toggle=False):
 		self.running = not self.running if toggle else True
-		print('Game is now {0}.'.format(('paused', 'running')[self.running]))
+		self.window.title('Platformer ({state})'.format(state=('paused', 'running')[self.running]))
 		if self.running:
 			self.tick() #
 
