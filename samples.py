@@ -17,15 +17,16 @@
 import PeerServer
 import Peer
 
+from Protocols import Event
+
 import tkinter as tk
 import tkinter.ttk as ttk
 
 import pickle
 import time
-
 import random
 
-from Protocols import Event
+from collections import namedtuple
 
 
 
@@ -118,8 +119,8 @@ class Platformer(object):
 		# TODO: Encapsulate graphical updates (?)
 		# TODO: How to pickle (?)
 		# TODO: Use namedtuple or class for bounds and points
-		def __init__(self, name, x, y, size, fill, canvas, arrow=tk.NORMAL):
-			self.name = name # Name as a string
+		def __init__(self, name, x, y, size, fill, canvas, transform, arrow=tk.NORMAL):
+			self.name = name     # Name as a string
 			self.jumping = False #
 
 			self.p = x+1j*y  # Position (m   : vector)
@@ -130,57 +131,65 @@ class Platformer(object):
 			self.size = size # Size (m : vector)
 
 			self.fill = fill #
-			self.visuals = self.createVisuals(canvas, arrow)
+			self.visuals = self.createVisuals(canvas, arrow, transform)
 
 		def velocity(self, v, add=False):
-			print('Setting velocity')
+			# print('Setting velocity')
 			self.v = self.v + v if add else v
 
-		def bounds(self, normalise=lambda x: x):
-			topleft     = self.p-self.size/2
-			bottomright = self.p+self.size/2
-			return  (normalise(topleft.real), normalise(topleft.imag), normalise(bottomright.real), normalise(bottomright.imag))
+		def bounds(self, transform, normalise=lambda x: x):
+			topleft     = transform(self.p-self.size/2)
+			bottomright = transform(self.p+self.size/2)
+			return (normalise(topleft.real), normalise(topleft.imag), normalise(bottomright.real), normalise(bottomright.imag))
+			# return  transform(topleft)+transform(bottomright)*1j
 
-		def label(self, coords=False, normalise=lambda x: x):
-			return (normalise(self.p.real), normalise(self.p.imag-self.size.imag/2-10)) # TODO: Don't hardcode distance (10)
+		def label(self, pady, transform, normalise=lambda x: x):
+			anchor = transform(self.p.real+(self.p.imag+self.size.imag/2+pady)*1j) # TODO: Don't hardcode distance (10)
+			return (normalise(anchor.real), normalise(anchor.imag))
 
-		def arrow(self, length, pady):
-			return (self.p.real, self.p.imag-self.size.imag/2-length-pady, self.p.real, self.p.imag-self.size.imag/2-pady)
+		def arrow(self, length, pady, transform, normalise=lambda x: x):
+			begin = transform(self.p.real+(self.p.imag+self.size.imag/2+length+pady)*1j) #
+			end   = transform(self.p.real+(self.p.imag+self.size.imag/2+pady)*1j)        #
+			return (normalise(begin.real), normalise(begin.imag), normalise(end.real), normalise(end.imag))
 
 		def jump(self, v):
 			if not self.jumping:
-				print('Jump')
 				self.v += v
 				self.jumping = True
 				# self.f['normal'] = 0+0j
 
-		def animate(self, dt):
+		def integrate(self, dt, p, v, a):
+			return (v*dt + (1/2)*a*dt**2)
+
+		def animate(self, dt, groundlevel):
 			# TODO: Encapsulate collisions (?)
 			past = self.p
 			# self.p += self.v * dt # TODO: Proper physics/forces/collisions/etc.
-			a = 9.82j if self.jumping else 0
-			self.p += (lambda p, v, a: (v*dt + (1/2)*a*dt**2))(self.p.real, self.v.real, a.real)   # Horizontal motion (self.a.real)
-			self.p += (lambda p, v, a: (v*dt + (1/2)*a*dt**2))(self.p.imag, self.v.imag, a.imag)*1j # Vertical motion
+			a = -9.82j if self.jumping else 0
+			self.p += self.integrate(dt, self.p.real, self.v.real, a.real)    # Horizontal motion (self.a.real)
+			self.p += self.integrate(dt, self.p.imag, self.v.imag, a.imag)*1j # Vertical motion
 			self.v += a*dt
 
-			# TODO: Don't hardcode groundlevel
-			if self.jumping and (self.p.imag >= (480 - 40 - self.size.imag/2)):
-				self.p = self.p.real+(480j - 40j - (self.size.imag/2)*1j)
+			# TODO: Don't hardcode groundlevel and canvas height
+			onground = groundlevel + self.size.imag/2 #
+
+			if self.jumping and (self.v.imag < 0) and (self.p.imag <= onground):
+				self.p = self.p.real+onground*1j
 				self.v = self.v.real
 				self.jumping = False
 
 			return past
 
-		def render(self, canvas):
-			canvas.coords(self.visuals['body'], self.bounds(normalise=int))
-			canvas.coords(self.visuals['nametag'], self.label())
-			canvas.itemconfig(self.visuals['nametag'], text='{name} {pos}'.format(name=self.name, pos=self.p))
-			canvas.coords(self.visuals['arrow'], self.arrow(length=18, pady=25+8))
+		def render(self, canvas, transform):
+			canvas.coords(self.visuals['body'], self.bounds(transform=transform, normalise=int))
+			canvas.coords(self.visuals['nametag'], self.label(pady=0.12, transform=transform, normalise=int))
+			canvas.itemconfig(self.visuals['nametag'], text='{name}'.format(name=self.name))
+			canvas.coords(self.visuals['arrow'], self.arrow(length=0.18, pady=0.20, transform=transform, normalise=int))
 
-		def createVisuals(self, canvas, arrow):
-			return { 'body':    canvas.create_rectangle(self.bounds(normalise=int), fill=self.fill, width=0),
-		             'nametag': canvas.create_text(self.label(), text=self.name, anchor=tk.CENTER, fill='#C9C9C9'),
-		             'arrow':   canvas.create_line(self.arrow(length=18, pady=25+8), width=14, fill='#89DF0D', state=arrow, arrow='last') }
+		def createVisuals(self, canvas, arrow, transform):
+			return { 'body':    canvas.create_rectangle(self.bounds(transform=transform, normalise=int), fill=self.fill, width=0),
+		             'nametag': canvas.create_text(self.label(pady=0.12, transform=transform, normalise=int), text=self.name, anchor=tk.CENTER, fill='#C9C9C9'),
+		             'arrow':   canvas.create_line(self.arrow(length=0.18, pady=0.20, transform=transform, normalise=int), width=14, fill='#89DF0D', state=arrow, arrow='last') }
 
 
 	def __init__(self):
@@ -201,19 +210,26 @@ class Platformer(object):
 
 		# World
 		self.groundlevel = 40
+		self.coordinatesystem = namedtuple('CoordinateSystem', 'scaling origin')(100-100j, (0.0+self.size[1])/100 * 1j) # TODO: Document coordinate system internals
 
 		# Canvas
 		self.canvas = tk.Canvas(width=self.size[0], height=self.size[1])
 		self.ground = self.canvas.create_rectangle((0, self.size[1]-self.groundlevel, self.size[0], self.size[0]), fill='#45DE9F', width=0)
 		self.canvas.pack()
 
+		# UI
+		self.mousecoords = self.canvas.create_text((5, 5), text='Screen (x={0}, y={1}) | World (x={2}, y={3})', anchor=tk.NW)
+		self.canvas.bind('<Motion>', lambda e: self.canvas.itemconfig(self.mousecoords, text='Screen {0} | World {1}'.format(e.x+e.y*1j, self.pointToWorldCoords(e.x+e.y*1j))))
+
 		# Players
 		self.player = Platformer.Player(name=random.choice(('Jonatan', 'Ali Baba', 'Ser Devon', 'Jayant')),
-			                            x=random.randint(20, self.size[0]-20),
-			                            y=self.size[1]-self.groundlevel-30/2,
-			                            size=18+30j,
+			                            x=random.uniform(1.0, 3.5-1.0), # TODO: Explicit conversion to world coords
+			                            y=self.pointToWorldCoords(0+(self.size[1]-self.groundlevel-30/2)*1j).imag,
+			                            size=0.15+0.32j, # 18+30j,
 			                            fill=random.choice(('#F35678', '#FB00EC', '#FF8C69', '#EED5D2', '#71C671', '#5E2612', '#DAA520', '#9ACD32')),
-			                            canvas=self.canvas)
+			                            canvas=self.canvas,
+			                            transform=lambda p: self.pointToScreenCoords(p, int),
+			                            arrow=tk.NORMAL)
 
 		self.others = {} # Other players
 
@@ -222,13 +238,13 @@ class Platformer(object):
 		self.FPS = 30        # Frames per second
 		
 		# Key bindings
-		self.window.bind('<KeyPress-Left>',  lambda e: self.player.velocity(v=-90-self.player.v.real, add=True))
-		self.window.bind('<KeyPress-Right>', lambda e: self.player.velocity(v= 90-self.player.v.real, add=True))
+		self.window.bind('<KeyPress-Left>',  lambda e: self.player.velocity(v=-1.2-self.player.v.real, add=True))
+		self.window.bind('<KeyPress-Right>', lambda e: self.player.velocity(v= 1.2-self.player.v.real, add=True))
 		
 		self.window.bind('<KeyRelease-Left>',  lambda e: self.player.velocity(v=-self.player.v.real, add=True))
 		self.window.bind('<KeyRelease-Right>', lambda e: self.player.velocity(v=-self.player.v.real, add=True))
 		
-		self.window.bind('<space>', lambda e: self.player.jump(-40j)) # TODO: No double-jumping
+		self.window.bind('<space>', lambda e: self.player.jump(3.0j)) # TODO: No double-jumping
 
 		self.window.bind('<KeyRelease-p>', lambda e: self.play(toggle=True)) # Start the game when player presses spacebar
 
@@ -240,6 +256,31 @@ class Platformer(object):
 
 		#
 		self.window.mainloop()
+
+
+	def pointToScreenCoords(self, point, normalise=lambda x: x):
+		# TODO: Rename (?)
+		# TODO: Allow X origin offset (✓)
+		origin  = self.coordinatesystem.origin
+		scaling = self.coordinatesystem.scaling
+
+		x = (point.real-origin.real)*scaling.real
+		y = (point.imag-origin.imag)*scaling.imag
+
+		return normalise(x)+normalise(y)*1j
+		# return (normalise(x), normalise(y))
+
+
+	def pointToWorldCoords(self, point, normalise=lambda x: x):
+		# TODO: Rename (?)
+		origin  = self.coordinatesystem.origin
+		scaling = self.coordinatesystem.scaling
+
+		x = (point.real/scaling.real)+origin.real
+		y = (point.imag/scaling.imag)+origin.imag
+
+		return normalise(x)+normalise(y)*1j
+		# return (normalise(x), normalise(y))
 
 
 	def play(self, toggle=False):
@@ -259,11 +300,11 @@ class Platformer(object):
 		if not self.running:
 			self.window.after(int(1000/self.FPS), lambda: self.tick())
 
-		past = self.player.animate(1.0/self.FPS)
-		self.player.render(self.canvas)
+		past = self.player.animate(1.0/self.FPS, self.pointToWorldCoords((self.size[1]-self.groundlevel)*1j).imag)
+		self.player.render(self.canvas, transform=lambda p: self.pointToScreenCoords(p, int))
 
 		for other in self.others.values():
-			other.render(self.canvas)
+			other.render(self.canvas, transform=lambda p: self.pointToScreenCoords(p, int))
 
 		if past != self.player.p:
 			self.notifyServer()
@@ -282,7 +323,7 @@ class Platformer(object):
 
 		# TODO: Use namedtuple instead (?)
 		# data.name, data.p.real, data.p.imag, self.size, self.canvas
-		self.others[ID] = Platformer.Player(data[0], data[1].real, data[1].imag, data[2], data[3], self.canvas, tk.HIDDEN)
+		self.others[ID] = Platformer.Player(data[0], data[1].real, data[1].imag, data[2], data[3], self.canvas, lambda p: self.pointToScreenCoords(p, int), tk.HIDDEN)
 
 		# self.others[ID].visuals = self.others[ID].createVisuals(self.canvas)
 
@@ -305,7 +346,7 @@ class Platformer(object):
 
 		'''
 
-		print('\nUpdating remote player ({ID}, {data})\n'.format(ID=ID, data=data))
+		# print('\nUpdating remote player ({ID}, {data})\n'.format(ID=ID, data=data))
 		self.others[ID].p = data #
 
 
