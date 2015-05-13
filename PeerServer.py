@@ -178,16 +178,14 @@ class PeerServer(object):
 				self.log('\n\nServer received {0:} bytes from {1:} ({2!r}).'.format(len(packet.data), peer.ID, packet.event)) # TODO: Print representation of incoming data (?)
 				self.callbacks[packet.event](packet) # TODO: Not sure if this should be here...
 			except ConnectionResetError:
-				self.log('Lost connection with {0:}.'.format(peer.ID))
-				self.broadcast(Protocols.Packet(event=Event.Disconnect, action=None, sender=peer.ID, data=b'', recipients=None))
-				del self.introductions[peer.ID] #
+				self.disconnect(peer)
 				return False
-			except Exception as e:
-				self.log(type(e))
-				self.log(e)
+			# except Exception as e:
+				# self.log(type(e))
+				# self.log(e)
 				# TODO: Remove peer from list
 				# TODO: Disconnection protocol (eg. tell other peers) (?)
-				return False # TODO: Meaningful return values (?)
+				# return False # TODO: Meaningful return values (?)
 
 			# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. packet.action)
 			# self.log('Server received {0:} bytes from {1:}.'.format(len(packet.data), peer)) # TODO: Print representation of incoming data (?)
@@ -203,8 +201,14 @@ class PeerServer(object):
 
 		'''
 
-		pass
-
+		# Handles peer disconnections
+		if peer.ID in self.connections:
+			self.log('Lost connection with {0:}.'.format(peer.ID))
+			self.broadcast(Protocols.Packet(event=Event.Disconnect, action=None, sender=peer.ID, data=b'', recipients=None))
+			del self.introductions[peer.ID] #
+			del self.connections[peer.ID]
+		else:
+			self.log('Cannot remove peer {0} (not connected)'.format(peer.ID))
 
 	def notifyNewPeer(self, packet):
 	
@@ -230,12 +234,8 @@ class PeerServer(object):
 
 		for recipient in recipients():
 				# if (recipient.ID != packet.sender) and (packet.recipients is None or recipient.ID in packet.recipients):
-				try:
-					self.send(recipient, packet)
-				except:
-					# TODO: Handle peer disconnection
-					print('')
-
+				self.send(recipient, packet)
+				
 
 	def send(self, peer, packet):
 		
@@ -261,8 +261,11 @@ class PeerServer(object):
 			# peer.send(bytes('{size:04d}'.format(size=len(data)), encoding='UTF-8'))
 			# peer.send(data)
 			# return peer.socket[0].send(bytes('{0:04d}'.format(len(data)), 'UTF-8') + data)
-			return Protocols.sendRaw(peer.socket[0], data, padding=4)
-
+			try:
+				return Protocols.sendRaw(peer.socket[0], data, padding=4) #
+			except:
+				# TODO: Handle peer disconnection (...)
+				self.disconnect(peer)
 
 	def receive(self, peer):
 		

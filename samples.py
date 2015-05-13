@@ -337,11 +337,15 @@ class Platformer(object):
 
 		'''
 		
-		#	
-		player = self.others[ID] # Player to be removed (he has become a nuisance)
-		for part in player.visuals.values():
-			self.canvas.delete(part)
-		del self.others[ID]
+		#
+		try:
+			player = self.others[ID] # Player to be removed (he has become a nuisance)
+			print('Removing player {0} ({1})'.format(ID, player.name))
+			for part in player.visuals.values():
+				self.canvas.delete(part)
+			del self.others[ID]
+		except KeyError as e:
+			print('Cannot remove non-existing player {0}'.format(ID))
 
 
 	def notifyServer(self):
