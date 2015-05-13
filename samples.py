@@ -218,8 +218,8 @@ class Platformer(object):
 		self.canvas.pack()
 
 		# UI
-		self.mousecoords = self.canvas.create_text((5, 5), text='Screen (x={0}, y={1}) | World (x={2}, y={3})', anchor=tk.NW)
-		self.canvas.bind('<Motion>', lambda e: self.canvas.itemconfig(self.mousecoords, text='Screen {0} | World {1}'.format(e.x+e.y*1j, self.pointToWorldCoords(e.x+e.y*1j))))
+		self.mousecoords = self.canvas.create_text((5, 5), text='Screen (x={0:.02f}, y={1:.02f}) | World (x={2:.02f}, y={3:.02f})', anchor=tk.NW)
+		self.canvas.bind('<Motion>', lambda e: self.canvas.itemconfig(self.mousecoords, text='Screen {0:.02f} | World {1:.02f}'.format(e.x+e.y*1j, self.pointToWorldCoords(e.x+e.y*1j))))
 
 		# Players
 		self.player = Platformer.Player(name=random.choice(('Jonatan', 'Ali Baba', 'Ser Devon', 'Jayant')),
@@ -252,7 +252,8 @@ class Platformer(object):
 		self.peer = Peer.Peer(('localhost', '192.168.1.88')[0], 12345, onreceive=lambda sender, data: self.updateRemotePlayer(sender, data),
 		                                        onconnect=lambda sender, data: self.addNewPlayer(sender, data),
 		                                        onauthenticated=lambda ID: self.peer.send(data=pickle.dumps((self.player.name, self.player.p, self.player.size, self.player.fill)),
-		                                                                                  event=Event.Connect)) #
+		                                                                                  event=Event.Connect),
+		                                        ondisconnect=lambda ID: self.removePlayer(ID)) #
 
 		#
 		self.window.mainloop()
@@ -298,7 +299,8 @@ class Platformer(object):
 		'''
 
 		if not self.running:
-			self.window.after(int(1000/self.FPS), lambda: self.tick())
+			#self.window.after(int(1000/self.FPS), lambda: self.tick())
+			return
 
 		past = self.player.animate(1.0/self.FPS, self.pointToWorldCoords((self.size[1]-self.groundlevel)*1j).imag)
 		self.player.render(self.canvas, transform=lambda p: self.pointToScreenCoords(p, int))
@@ -326,6 +328,20 @@ class Platformer(object):
 		self.others[ID] = Platformer.Player(data[0], data[1].real, data[1].imag, data[2], data[3], self.canvas, lambda p: self.pointToScreenCoords(p, int), tk.HIDDEN)
 
 		# self.others[ID].visuals = self.others[ID].createVisuals(self.canvas)
+
+
+	def removePlayer(self, ID):
+
+		'''
+		Docstring goes here
+
+		'''
+		
+		#	
+		player = self.others[ID] # Player to be removed (he has become a nuisance)
+		for part in player.visuals.values():
+			self.canvas.delete(part)
+		del self.others[ID]
 
 
 	def notifyServer(self):

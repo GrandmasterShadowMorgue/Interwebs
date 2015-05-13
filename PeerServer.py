@@ -77,7 +77,7 @@ class PeerServer(object):
 		# self.protocol  = protocol #
 		# self.onsend    = onsend    # 
 		# self.onreceive = onreceive
-		self.introductions = [] # A list of introductions from each peer
+		self.introductions = {} # A dict (ID : intro) of introductions from each peer
 		self.callbacks = {
 			Event.Data         : lambda packet: self.broadcast(packet), # - A Peer is sending data
 			Event.Disconnect   : lambda packet: None, # - A Peer has disconnected
@@ -133,7 +133,7 @@ class PeerServer(object):
 
 		# Send previous introductions to newly connected peer (use Event.Introduce event instead)
 		# TODO: Use dict for introductions (easier to remove when peer disconnects)
-		for introduction in self.introductions:
+		for introduction in self.introductions.values():
 			self.send(peer, introduction)
 			
 		self.connections[peer.ID] = peer #
@@ -177,11 +177,14 @@ class PeerServer(object):
 				# self.log('\n\nReceived data from peer {0}'.format(peer.ID))
 				self.log('\n\nServer received {0:} bytes from {1:} ({2!r}).'.format(len(packet.data), peer.ID, packet.event)) # TODO: Print representation of incoming data (?)
 				self.callbacks[packet.event](packet) # TODO: Not sure if this should be here...
-			# except ConnectionResetError
+			except ConnectionResetError:
+				self.log('Lost connection with {0:}.'.format(peer.ID))
+				self.broadcast(Protocols.Packet(event=Event.Disconnect, action=None, sender=peer.ID, data=b'', recipients=None))
+				del self.introductions[peer.ID] #
+				return False
 			except Exception as e:
 				self.log(type(e))
 				self.log(e)
-				self.log('Lost connection with {0:}.'.format(peer.ID))
 				# TODO: Remove peer from list
 				# TODO: Disconnection protocol (eg. tell other peers) (?)
 				return False # TODO: Meaningful return values (?)
@@ -210,7 +213,7 @@ class PeerServer(object):
 	
 		'''
 	
-		self.introductions.append(packet)
+		self.introductions[packet.sender] = packet
 		self.broadcast(packet)
 
 
@@ -227,7 +230,11 @@ class PeerServer(object):
 
 		for recipient in recipients():
 				# if (recipient.ID != packet.sender) and (packet.recipients is None or recipient.ID in packet.recipients):
-				self.send(recipient, packet)
+				try:
+					self.send(recipient, packet)
+				except:
+					# TODO: Handle peer disconnection
+					print('')
 
 
 	def send(self, peer, packet):
