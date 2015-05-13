@@ -79,12 +79,12 @@ class PeerServer(object):
 		# self.onreceive = onreceive
 		self.introductions = {} # A dict (ID : intro) of introductions from each peer
 		self.callbacks = {
-			Event.Data         : lambda packet: self.broadcast(packet), # - A Peer is sending data
-			Event.Disconnect   : lambda packet: None, # - A Peer has disconnected
+			Event.Data         : lambda packet: self.broadcast(packet),     # - A Peer is sending data
+			Event.Disconnect   : lambda packet: None,                       # - A Peer has disconnected
 			Event.Connect      : lambda packet: self.notifyNewPeer(packet), # - A Peer is attempting to connect
-			Event.Introduce    : lambda packet: None, # - A Peer introduces itself (username, id, etc.)
-			Event.Verify       : lambda packet: None, # - A Peer verifies that it has received a Packet
-			Event.Authenticate : lambda packet: None  # - Server is authenticating a peer (currently: sends an ID)
+			Event.Introduce    : lambda packet: None,                       # - A Peer introduces itself (username, id, etc.)
+			Event.Verify       : lambda packet: None,                       # - A Peer verifies that it has received a Packet
+			Event.Authenticate : lambda packet: None                        # - Server is authenticating a peer (currently: sends an ID)
 		}
 
 		# 
@@ -240,7 +240,7 @@ class PeerServer(object):
 	def send(self, peer, packet):
 		
 		'''
-		Send data (raw bytes) to a specific peer.
+		Send a packet to a specific peer.
 
 		'''
 
