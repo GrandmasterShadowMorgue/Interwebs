@@ -19,8 +19,8 @@ import socket
 import threading
 import pickle
 
-import Protocols
-from Protocols import Event, Packet
+from Interwebs import Protocols
+from Interwebs.Protocols import Event, Packet
 
 
 

@@ -14,6 +14,22 @@
 
 
 
+from Interwebs import PeerServer
+from Interwebs import Peer
+
+from Interwebs.Protocols import Event
+
+import tkinter as tk
+import tkinter.ttk as ttk
+
+import pickle
+import time
+import random
+
+from collections import namedtuple
+
+
+
 class ChatClient(object):
 
 	'''
