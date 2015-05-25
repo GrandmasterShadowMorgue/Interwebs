@@ -16,13 +16,14 @@
 
 import platformer
 import chat
+import radio
 
 
 # Sample programs
 programs = {
-	'chat':       lambda: chat.ChatClient(), #
+	'chat':       lambda: chat.ChatClient(),       #
 	'platformer': lambda: platformer.Platformer(), #
-	'': lambda: None
+	'radio':      lambda: radio.RadioStation()     #
 }
 
 
@@ -34,11 +35,10 @@ def main():
 
 	'''
 
-	#
 	# print('Which sample would you like to run?')
 	# print('\n'.join('  [{0}] {1}'.format(n, sample) for n, sample in enumerate(programs.keys(), 1)))
 	# programs[input('  Choose: ')]()
-	programs['platformer']()
+	programs['radio']()
 
 
 

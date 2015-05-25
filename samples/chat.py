@@ -68,7 +68,7 @@ class ChatClient(object):
 
 		self.entries = []
 
-		self.peer = Peer.Peer('localhost', 255, onreceive=lambda sender, data: self.addEntry(data), onconnect=lambda sender, data: None) #
+		self.peer = Peer.Peer('localhost', 12345, onreceive=lambda sender, data: self.addEntry(data), onconnect=lambda sender, data: None) #
 
 		#
 		self.window.mainloop()

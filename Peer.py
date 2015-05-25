@@ -49,7 +49,8 @@ class Peer(object):
 		self.onauthenticated = onauthenticated or (lambda ID: print('Peer {0} has been authenticated'.format(ID)))
 		self.ondisconnect    = ondisconnect    or (lambda ID: print('Peer {0} has disconnected'.format(ID)))
 		self.callbacks = {
-			Event.Data         : lambda packet: onreceive(packet.sender, pickle.loads(packet.data)),      # - A Peer is sending data (give clients access to the entire packet?)
+		# pickle.loads
+			Event.Data         : lambda packet: onreceive(packet.sender, (packet.data)),      # - A Peer is sending data (give clients access to the entire packet?)
 			Event.Disconnect   : lambda packet: self.ondisconnect(packet.sender),                         # - A Peer has disconnected
 			Event.Connect      : lambda packet: onconnect(packet.sender, pickle.loads(packet.data)), # - A Peer is attempting to connect (eg. ANOTHER peer)
 			Event.Verify       : lambda packet: None,                                                     # - A Peer verifies that it has received a packet
@@ -101,21 +102,24 @@ class Peer(object):
 
 		while True:
 			self.log('Client running protocol')
-			try:
+			packet = Protocols.receive(self.socket)
+			self.callbacks[packet.event](packet) #
+
+			# try:
 				# TODO: Handle blocks
-				packet = Protocols.receive(self.socket)
+				# packet = Protocols.receive(self.socket)
 
 				# data = pickle.loads(received) # TODO: Allow custom action (other than pickle; cf. packet.action)
 				# self.log('Peer received {0} bytes from server ({1}).'.format(len(packet.data), packet.event)) # TODO: Print representation of incoming data (?)
-				self.callbacks[packet.event](packet) #
+				# self.callbacks[packet.event](packet) #
 				# self.onreceive(data)
 			# except Exception as e:
-			except ValueError as e:
+			# except ValueError as e:
 				# TODO: Split exception handling when we're done debugging
-				self.log(type(e))
-				self.log(e)
-				self.log('Lost connection with server')
-				return False # TODO: Meaningful return values (?)
+				# self.log(type(e))
+				# self.log(e)
+				# self.log('Lost connection with server')
+				# return False # TODO: Meaningful return values (?)
 
 		self.log('Client somehow escaped protocol loop')
 

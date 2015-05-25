@@ -22,10 +22,19 @@ page = '''
 		<!-- <script src='https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js'></script>  -->
 		<!-- <script src='script.js'></script> -->
 		<title>title</title>
+
+		<style>
+			p:hover {
+				background-color: #E12DE3;
+				-webkit-transition: background-color 0.8s;
+			}
+		</style>
 	</head>
 
 	<body>
+		<h1>HTML Views in Python</h1>
 		<p>I'm a dashing violet</p>
+		<p>I'm a sparkling dandelion</p>
 	</body>
 </html>
 '''

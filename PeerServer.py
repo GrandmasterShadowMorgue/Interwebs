@@ -62,8 +62,8 @@ class PeerServer(object):
 		'''
 
 		# Configurations
-		self.debug   = True
-		self.running = True #
+		self.debug   = True # 
+		self.running = True # 
 		self.maximum = 5    # Maximum number of simultaneous peers
 
 		# Protocol

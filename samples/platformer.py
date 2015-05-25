@@ -168,7 +168,7 @@ class Platformer(object):
 			                            # TODO: Explicit conversion to world coords
 			                            position=self.pointToWorldCoords(random.uniform(20, self.size[0]-20)+(self.size[1]-self.groundlevel-30/2)*1j),
 			                            size=0.15+0.32j, # 18+30j,
-			                            fill=random.choice(('#F35678', '#FB00EC', '#FF8C69', '#EED5D2', '#71C671', '#5E2612', '#DAA520', '#9ACD32')),
+			                            fill=random.choice(('#F35678', '#FB00EC', '#FF8C69', '#EED5D2', '#71C671', '#F08D00', '#DAA520', '#9ACD32')),
 			                            canvas=self.canvas,
 			                            transform=lambda p: self.pointToScreenCoords(p, int),
 			                            arrow=tk.NORMAL)
@@ -181,23 +181,21 @@ class Platformer(object):
 		
 		# Key bindings
 		# TODO: Refactor
-		self.window.bind('<KeyPress-Left>',  lambda e: self.player.body.velocity(v=-1.2-self.player.body.v.real, add=True))
-		self.window.bind('<KeyPress-Right>', lambda e: self.player.body.velocity(v= 1.2-self.player.body.v.real, add=True))
+		for key, velocity in (('Left', -1.2), ('Right', 1.2)):
+			self.window.bind('<KeyPress-{0}>'.format(key),   lambda e, velocity=velocity: self.player.body.velocity(v=velocity-self.player.body.v.real, add=True)) #
+			self.window.bind('<KeyRelease-{0}>'.format(key), lambda e: self.player.body.velocity(v=-self.player.body.v.real, add=True))                            #
 		
-		self.window.bind('<KeyRelease-Left>',  lambda e: self.player.body.velocity(v=-self.player.body.v.real, add=True))
-		self.window.bind('<KeyRelease-Right>', lambda e: self.player.body.velocity(v=-self.player.body.v.real, add=True))
-		
-		self.window.bind('<space>', lambda e: self.player.body.jump(3.0j)) # TODO: No double-jumping
-
+		self.window.bind('<space>', lambda e: self.player.body.jump(3.0j))   # TODO: No double-jumping
 		self.window.bind('<KeyRelease-p>', lambda e: self.play(toggle=True)) # Start the game when player presses spacebar
 
 		# 
 		# TODO: Refactor
-		self.peer = Peer.Peer(('localhost', '192.168.1.88')[0], 12345,
-			onreceive=lambda sender, data: self.updateRemotePlayer(sender, data),
-			onconnect=lambda sender, data: self.addNewPlayer(sender, data),
-			onauthenticated=lambda ID: self.peer.send(data=self.serializePlayer(self.player), event=Event.Connect),
-			ondisconnect=lambda ID: self.removePlayer(ID)) #
+		self.peer = Peer.Peer(('localhost', '192.168.1.88')[0], 12345, **{
+			'onauthenticated' : lambda ID: self.peer.send(data=self.serializePlayer(self.player), event=Event.Connect), # 
+			'onreceive' :       lambda sender, data: self.updateRemotePlayer(sender, data),                             # 
+			'onconnect' :       lambda sender, data: self.addNewPlayer(sender, data),                                   # 
+			'ondisconnect' :    lambda ID: self.removePlayer(ID)                                                        # 
+		})
 
 		#
 		self.window.mainloop()
